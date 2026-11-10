@@ -110,12 +110,13 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
     const container = containerRef.current;
     if (!container) return;
 
-    const width = container.clientWidth || (size === 'sm' ? 120 : 380);
-    const height = container.clientHeight || (size === 'sm' ? 120 : 400);
+    const width = container.clientWidth || (size === 'sm' ? 150 : 480);
+    const height = container.clientHeight || (size === 'sm' ? 150 : 440);
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(35, width / height, 0.1, 100);
-    camera.position.set(0, -0.08, 6.65);
+    // Generous wide-angle frustum (FOV 40, z = 8.65) so tentacles, long antennae, wings, and jump arcs NEVER clip against the canvas boundary
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+    camera.position.set(0, -0.04, 8.65);
 
     const renderer = new THREE.WebGLRenderer({
       antialias: !batterySaver,
@@ -127,6 +128,8 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.24;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.domElement.style.display = 'block';
+    renderer.domElement.style.overflow = 'visible';
 
     // Studio PBR Environment Lighting (RoomEnvironment + PMREMGenerator)
     const pmremGenerator = new THREE.PMREMGenerator(renderer);

@@ -62,26 +62,27 @@ export const CompanionCanvas: React.FC<CompanionCanvasProps> = ({
   const isSpeaking = animation === 'speak';
   const isSleeping = animation === 'sleep' || mood === 'tired';
 
+  // Unclipped wide stage so tentacles, antennae, and wings never hit a container border
   const stageSizeClass =
     size === 'sm'
-      ? 'w-28 h-28'
+      ? 'w-36 h-36 overflow-visible'
       : size === 'md'
-        ? 'w-56 h-56'
-        : 'w-72 h-72 sm:w-88 sm:h-88 md:w-96 md:h-96';
+        ? 'w-72 h-72 overflow-visible'
+        : 'w-full min-h-[390px] sm:min-h-[450px] md:min-h-[480px] overflow-visible';
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: 'spring', stiffness: 220, damping: 24 }}
-      className={`relative flex flex-col items-center justify-center select-none ${
-        size === 'sm' ? 'p-1' : 'p-2 sm:p-4'
+      className={`relative w-full overflow-visible flex flex-col items-center justify-center select-none ${
+        size === 'sm' ? 'p-0' : 'p-0'
       }`}
     >
       {/* Dynamic Ambient Room Atmosphere Aura driven by Framer Motion */}
       <motion.div
         animate={{
-          scale: room === 'morning' ? 1.08 : room === 'night' ? 1.04 : 0.98,
+          scale: room === 'morning' ? 1.12 : room === 'night' ? 1.08 : 1.02,
           opacity: isSleeping ? 0.45 : 0.72,
         }}
         transition={{ duration: 0.9, ease: 'easeInOut' }}
@@ -95,7 +96,7 @@ export const CompanionCanvas: React.FC<CompanionCanvasProps> = ({
         aria-hidden="true"
       />
 
-      {/* 3D WebGL Character Stage with Framer Motion Avatar Switching */}
+      {/* Unclipped 3D WebGL Character Stage with Framer Motion Avatar Switching */}
       <div
         className={`relative z-10 flex items-center justify-center focus:outline-none ${stageSizeClass}`}
       >
@@ -106,7 +107,7 @@ export const CompanionCanvas: React.FC<CompanionCanvasProps> = ({
             animate={{ opacity: 1, scale: 1, rotateY: 0 }}
             exit={{ opacity: 0, scale: 0.86, rotateY: 18 }}
             transition={{ type: 'spring', stiffness: 240, damping: 22 }}
-            className="relative w-full h-full flex items-center justify-center"
+            className="relative w-full h-full overflow-visible flex items-center justify-center"
           >
             <ThreeCompanionScene
               avatarId={avatarId}
@@ -123,7 +124,7 @@ export const CompanionCanvas: React.FC<CompanionCanvasProps> = ({
           </motion.div>
         </AnimatePresence>
 
-        {/* Framer Motion Equalizer Indicator when Speaking (replaces CSS animate-bounce) */}
+        {/* Framer Motion Equalizer Indicator when Speaking */}
         <AnimatePresence>
           {isSpeaking && (
             <motion.div
@@ -131,7 +132,7 @@ export const CompanionCanvas: React.FC<CompanionCanvasProps> = ({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.9 }}
               transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-              className="absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/85 backdrop-blur-md border border-white/15 pointer-events-none shadow-lg"
+              className="absolute bottom-14 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/85 backdrop-blur-md border border-white/15 pointer-events-none shadow-lg z-30"
             >
               {[0, 1, 2, 3].map((barIdx) => (
                 <motion.span
@@ -160,7 +161,7 @@ export const CompanionCanvas: React.FC<CompanionCanvasProps> = ({
               animate={{ opacity: [0.4, 1, 0.4], y: [-2, -10, -2] }}
               exit={{ opacity: 0 }}
               transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
-              className="absolute top-3 right-4 font-mono text-xs font-semibold text-indigo-400 dark:text-indigo-300"
+              className="absolute top-3 right-4 font-mono text-xs font-semibold text-indigo-400 dark:text-indigo-300 z-30"
             >
               Zzz
             </motion.span>
@@ -172,7 +173,7 @@ export const CompanionCanvas: React.FC<CompanionCanvasProps> = ({
       {size !== 'sm' && (
         <motion.div
           layout
-          className="relative z-10 mt-2 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300"
+          className="relative z-20 mt-1 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300"
         >
           <span className="font-semibold text-slate-900 dark:text-slate-100">{label}</span>
           <span aria-hidden="true">·</span>
