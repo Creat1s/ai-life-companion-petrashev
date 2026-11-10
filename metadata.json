@@ -1,0 +1,6 @@
+{
+  "name": "AI Life Companion",
+  "description": "Personal AI assistant with an offline-capable virtual companion, safe action gateway, local analytics, and granular privacy controls.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
