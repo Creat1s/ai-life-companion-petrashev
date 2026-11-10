@@ -110,17 +110,52 @@ export const SourceDownloadModal: React.FC<SourceDownloadModalProps> = ({
   const [copiedCmd, setCopiedCmd] = useState(false);
   const [downloadingZip, setDownloadingZip] = useState(false);
 
-  // Git & GitHub / GitLab Sync Form State
+  // Git & GitHub / GitLab Sync Form State (persisted in localStorage for convenience)
   const [provider, setProvider] = useState<'github' | 'gitlab'>('github');
-  const [repoUrl, setRepoUrl] = useState('');
-  const [token, setToken] = useState('');
-  const [repoName, setRepoName] = useState('ai-life-companion-petrashev');
+  const [repoUrl, setRepoUrl] = useState(() => localStorage.getItem('petrashev_git_repo_url') || '');
+  const [githubUsername, setGithubUsername] = useState(
+    () => localStorage.getItem('petrashev_github_user') || ''
+  );
+  const [token, setToken] = useState(() => localStorage.getItem('petrashev_git_token') || '');
+  const [repoName, setRepoName] = useState(
+    () => localStorage.getItem('petrashev_git_repo_name') || 'ai-life-companion-petrashev'
+  );
   const [isPrivate, setIsPrivate] = useState(false);
   const [newCommitMsg, setNewCommitMsg] = useState('');
   const [syncStatus, setSyncStatus] = useState<{
-    type: 'idle' | 'loading' | 'success' | 'error';
+    type: 'idle' | 'loading' | 'success' | 'mirror' | 'error';
     message: string;
+    quickTokenUrl?: string;
   }>({ type: 'idle', message: '' });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('petrashev_git_repo_url', repoUrl);
+      localStorage.setItem('petrashev_github_user', githubUsername);
+      localStorage.setItem('petrashev_git_token', token);
+      localStorage.setItem('petrashev_git_repo_name', repoName);
+    } catch {
+      // ignore storage quota
+    }
+  }, [repoUrl, githubUsername, token, repoName]);
+
+  useEffect(() => {
+    const handleOAuthMessage = (event: MessageEvent) => {
+      const origin = event.origin || '';
+      if (!origin.endsWith('.run.app') && !origin.includes('localhost')) {
+        return;
+      }
+      if (event.data?.type === 'OAUTH_AUTH_SUCCESS' && event.data?.token) {
+        setToken(event.data.token);
+        setSyncStatus({
+          type: 'success',
+          message: 'Аккаунт GitHub успешно подключён через OAuth! Теперь нажмите «Отправить все коммиты и код в GitHub (Push)».',
+        });
+      }
+    };
+    window.addEventListener('message', handleOAuthMessage);
+    return () => window.removeEventListener('message', handleOAuthMessage);
+  }, []);
 
   const loadData = () => {
     setLoading(true);
@@ -204,7 +239,6 @@ export const SourceDownloadModal: React.FC<SourceDownloadModalProps> = ({
         setSyncStatus({ type: 'error', message: data.error || 'Ошибка коммита' });
       }
     } catch {
-      // Offline fallback commit
       const fakeHash = Math.random().toString(16).slice(2, 9);
       setGitInfo((prev) => ({
         ...prev,
@@ -234,7 +268,7 @@ export const SourceDownloadModal: React.FC<SourceDownloadModalProps> = ({
     e.preventDefault();
     setSyncStatus({
       type: 'loading',
-      message: `Синхронизация всех коммитов и авторства (Петрашев Виктор Владимирович) с ${
+      message: `Фиксация коммитов (Петрашев Виктор Владимирович) и отправка в ${
         provider === 'github' ? 'GitHub' : 'GitLab'
       }...`,
     });
@@ -246,6 +280,7 @@ export const SourceDownloadModal: React.FC<SourceDownloadModalProps> = ({
         body: JSON.stringify({
           provider,
           repoUrl,
+          githubUsername,
           token,
           repoName,
           isPrivate,
@@ -255,11 +290,23 @@ export const SourceDownloadModal: React.FC<SourceDownloadModalProps> = ({
       const data = await res.json();
       if (res.ok && data.ok) {
         setGitInfo(data);
-        setRepoUrl(data.pushedTo || repoUrl);
-        setSyncStatus({
-          type: 'success',
-          message: `Успешно отправлено в репозиторий: ${data.pushedTo}! Все коммиты, даты и авторство Петрашева Виктора Владимировича сохранены.`,
-        });
+        if (data.pushedTo && !data.pushedTo.startsWith('mirror://')) {
+          setRepoUrl(data.pushedTo);
+        }
+        if (data.mirrorOnly) {
+          setSyncStatus({
+            type: 'mirror',
+            message: `✅ Все коммиты и код подписаны именем «Петрашев Виктор Владимирович» и сохранены в локальный репозиторий (.git) и параллельное зеркало! Чтобы сервер также автоматически создал и обновил репозиторий «${repoName}» прямо в вашем личном облаке GitHub, вставьте ваш токен GitHub (ghp_...) в поле №1 выше (или нажмите зелёную кнопку ниже, чтобы сгенерировать токен на GitHub в 1 клик).`,
+            quickTokenUrl:
+              data.quickTokenUrl ||
+              'https://github.com/settings/tokens/new?description=AI+Life+Companion+Petrashev+Viktor&scopes=repo',
+          });
+        } else {
+          setSyncStatus({
+            type: 'success',
+            message: `🎉 Успешно отправлено в облачный репозиторий: ${data.pushedTo}! Все коммиты, даты и авторство Петрашева Виктора Владимировича сохранены.`,
+          });
+        }
       } else {
         setSyncStatus({
           type: 'error',
@@ -451,23 +498,35 @@ ${gitInfo.commits
                   </p>
 
                   <div className="space-y-3">
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        1. Персональный токен доступа ({provider === 'github' ? 'GitHub Personal Access Token' : 'GitLab Token'}):
-                      </label>
+                    <div className="p-3 rounded-xl bg-white/80 dark:bg-slate-900/90 border border-blue-500/30 space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          1. Персональный токен доступа ({provider === 'github' ? 'GitHub Token' : 'GitLab Token'}):
+                        </label>
+                        {provider === 'github' && (
+                          <a
+                            href="https://github.com/settings/tokens/new?description=AI+Life+Companion+Petrashev+Viktor&scopes=repo"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold transition-colors shadow-sm"
+                          >
+                            <span>🔑 Открыть GitHub и получить токен в 1 клик (галочка repo уже отмечена) ↗</span>
+                          </a>
+                        )}
+                      </div>
                       <input
                         type="password"
                         value={token}
                         onChange={(e) => setToken(e.target.value)}
                         placeholder={
                           provider === 'github'
-                            ? 'ghp_... или github_pat_... (с правом repo)'
-                            : 'glpat-... (с правом write_repository)'
+                            ? 'Вставьте сюда токен ghp_... (и нажмите синюю кнопку Push ниже)'
+                            : 'Вставьте токен glpat-... (с правом write_repository)'
                         }
-                        className="w-full min-h-[40px] px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono"
+                        className="w-full min-h-[40px] px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs font-mono"
                       />
-                      <span className="text-[11px] text-slate-400 block mt-1">
-                        Где взять в GitHub за 15 сек: GitHub → Settings → Developer settings → Personal access tokens (Classic) → Generate new token → отметьте галочку <code>repo</code>.
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 block leading-snug">
+                        Нажмите зелёную кнопку выше → в открывшемся окне GitHub в самом низу нажмите зелёную кнопку <strong>Generate token</strong> → скопируйте код <code>ghp_...</code> и вставьте сюда. Репозиторий создастся в вашем аккаунте автоматически!
                       </span>
                     </div>
 
@@ -487,13 +546,13 @@ ${gitInfo.commits
 
                       <div>
                         <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                          Или готовый URL репозитория:
+                          Ваш логин или URL репозитория (необязательно):
                         </label>
                         <input
                           type="text"
                           value={repoUrl}
                           onChange={(e) => setRepoUrl(e.target.value)}
-                          placeholder="https://github.com/ваш-логин/repo.git"
+                          placeholder="Оставьте пустым — определится по токену"
                           className="w-full min-h-[38px] px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono"
                         />
                       </div>
@@ -524,15 +583,40 @@ ${gitInfo.commits
 
                   {syncStatus.type !== 'idle' && (
                     <div
-                      className={`p-3 rounded-xl text-xs font-medium ${
+                      className={`p-3.5 rounded-xl text-xs font-medium space-y-2.5 ${
                         syncStatus.type === 'success'
-                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30'
-                          : syncStatus.type === 'error'
-                            ? 'bg-rose-500/15 text-rose-600 dark:text-rose-300 border border-rose-500/30'
-                            : 'bg-blue-500/15 text-blue-600 dark:text-blue-300'
+                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
+                          : syncStatus.type === 'mirror'
+                            ? 'bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/40'
+                            : syncStatus.type === 'error'
+                              ? 'bg-rose-500/15 text-rose-600 dark:text-rose-300 border border-rose-500/30'
+                              : 'bg-blue-500/15 text-blue-600 dark:text-blue-300'
                       }`}
                     >
-                      {syncStatus.message}
+                      <p className="leading-relaxed">{syncStatus.message}</p>
+                      {syncStatus.type === 'mirror' && (
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          <a
+                            href={
+                              syncStatus.quickTokenUrl ||
+                              'https://github.com/settings/tokens/new?description=AI+Life+Companion+Petrashev+Viktor&scopes=repo'
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-sm"
+                          >
+                            <span>🔑 Шаг 1: Открыть GitHub и нажать «Generate token» ↗</span>
+                          </a>
+                          <button
+                            type="button"
+                            onClick={handleDownloadFullZip}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold cursor-pointer"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Или скачать архив .ZIP (внутри скрипт PUSH_TO_GITHUB.bat)</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </form>

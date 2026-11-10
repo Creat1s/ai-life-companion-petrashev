@@ -670,13 +670,87 @@ ${customInstruction ? `Пожелание владельца к ответу: "$
     }
   });
 
-  // 9. Parallel Sync / Push to GitHub or GitLab Repository
+  // 8b. GitHub OAuth Popup Endpoints (for 1-click OAuth when GITHUB_CLIENT_ID is configured)
+  app.get('/api/auth/github/url', (req, res) => {
+    const clientId = process.env.GITHUB_CLIENT_ID || process.env.CLIENT_ID || '';
+    const appUrl =
+      process.env.APP_URL ||
+      `${req.protocol}://${req.get('host')}`;
+    const redirectUri = `${appUrl.replace(/\/$/, '')}/auth/github/callback`;
+
+    if (!clientId) {
+      res.json({
+        configured: false,
+        quickTokenUrl:
+          'https://github.com/settings/tokens/new?description=AI+Life+Companion+Petrashev+Viktor&scopes=repo',
+        redirectUri,
+      });
+      return;
+    }
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      scope: 'repo user:email',
+    });
+    res.json({
+      configured: true,
+      url: `https://github.com/login/oauth/authorize?${params.toString()}`,
+      redirectUri,
+    });
+  });
+
+  app.get(['/auth/github/callback', '/auth/github/callback/'], async (req, res) => {
+    try {
+      const code = String(req.query.code || '');
+      const clientId = process.env.GITHUB_CLIENT_ID || process.env.CLIENT_ID || '';
+      const clientSecret = process.env.GITHUB_CLIENT_SECRET || process.env.CLIENT_SECRET || '';
+      let accessToken = '';
+
+      if (code && clientId && clientSecret) {
+        const tokenResp = await fetch('https://github.com/login/oauth/access_token', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            client_id: clientId,
+            client_secret: clientSecret,
+            code,
+          }),
+        });
+        const tokenData = (await tokenResp.json()) as { access_token?: string };
+        accessToken = tokenData.access_token || '';
+      }
+
+      res.send(`<!doctype html>
+<html>
+  <body style="font-family: sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh;">
+    <script>
+      if (window.opener) {
+        window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS', provider: 'github', token: ${JSON.stringify(accessToken)} }, '*');
+        window.close();
+      } else {
+        window.location.href = '/';
+      }
+    </script>
+    <p>Авторизация GitHub успешна. Окно закроется автоматически...</p>
+  </body>
+</html>`);
+    } catch {
+      res.redirect('/');
+    }
+  });
+
+  // 9. Parallel Sync / Push to GitHub, GitLab, and Local Parallel Bare Mirror Repository
   app.post('/api/git/sync-remote', async (req, res) => {
     try {
       ensureGitRepoInitialized(__dirname);
       const {
         provider = 'github',
         repoUrl = '',
+        githubUsername = '',
         token = '',
         repoName = 'ai-life-companion-petrashev',
         isPrivate = false,
@@ -689,7 +763,7 @@ ${customInstruction ? `Пожелание владельца к ответу: "$
 
       const msg =
         commitMessage.trim() ||
-        `feat(release): Синхронизация авторской разработки — ${AUTHOR_NAME} (${new Date().toISOString()})`;
+        `feat(release): Синхронизация авторской разработки и 3D-анимации — ${AUTHOR_NAME} (${new Date().toISOString()})`;
       try {
         execSync(`git commit --allow-empty -m ${JSON.stringify(msg)}`, {
           cwd: __dirname,
@@ -699,13 +773,39 @@ ${customInstruction ? `Пожелание владельца к ответу: "$
         // continue
       }
 
+      // Always sync immediately to the parallel bare mirror repository on the server
+      const mirrorDir = path.join('/tmp', 'ai-life-companion-petrashev-mirror.git');
+      try {
+        if (!fs.existsSync(mirrorDir)) {
+          execSync(`git init --bare ${JSON.stringify(mirrorDir)}`, { stdio: 'ignore' });
+        }
+        try {
+          execSync('git remote remove mirror', { cwd: __dirname, stdio: 'ignore' });
+        } catch {
+          // ignore
+        }
+        execSync(`git remote add mirror ${JSON.stringify(mirrorDir)}`, { cwd: __dirname, stdio: 'ignore' });
+        execSync('git branch -M main', { cwd: __dirname, stdio: 'ignore' });
+        execSync('git push mirror main --force', { cwd: __dirname, stdio: 'ignore' });
+      } catch {
+        // ignore mirror warnings
+      }
+
+      const effectiveToken = (token || process.env.GITHUB_TOKEN || '').trim();
+      const cleanRepoName = (repoName || 'ai-life-companion-petrashev').trim();
       let targetRepoUrl = repoUrl.trim();
 
-      // If GitHub token is provided and no repoUrl (or user wants auto-creation on GitHub), verify/create via GitHub API
-      if (token.trim() && provider === 'github' && !targetRepoUrl) {
+      if (!targetRepoUrl && githubUsername.trim()) {
+        const cleanUser = githubUsername.trim().replace(/^@/, '');
+        const host = provider === 'gitlab' ? 'gitlab.com' : 'github.com';
+        targetRepoUrl = `https://${host}/${cleanUser}/${cleanRepoName}.git`;
+      }
+
+      // If GitHub token is provided and no repoUrl, auto-detect user login & create repository via GitHub API
+      if (effectiveToken && provider === 'github') {
         const userResp = await fetch('https://api.github.com/user', {
           headers: {
-            Authorization: `Bearer ${token.trim()}`,
+            Authorization: `Bearer ${effectiveToken}`,
             Accept: 'application/vnd.github+json',
             'User-Agent': 'ai-life-companion-petrashev',
           },
@@ -713,18 +813,18 @@ ${customInstruction ? `Пожелание владельца к ответу: "$
 
         if (!userResp.ok) {
           res.status(400).json({
-            error: 'Не удалось авторизоваться в GitHub по указанному токену. Проверьте права токена (scope: repo).',
+            error:
+              'Токен GitHub отклонён. Убедитесь, что скопировали токен полностью (начинается с ghp_... или github_pat_...) и отметили галочку repo.',
           });
           return;
         }
         const userData = (await userResp.json()) as { login: string };
-        const cleanRepoName = repoName.trim() || 'ai-life-companion-petrashev';
 
-        // Create repo if it doesn't exist
+        // Create repo if it doesn't exist yet
         await fetch('https://api.github.com/user/repos', {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${token.trim()}`,
+            Authorization: `Bearer ${effectiveToken}`,
             Accept: 'application/vnd.github+json',
             'User-Agent': 'ai-life-companion-petrashev',
             'Content-Type': 'application/json',
@@ -737,20 +837,37 @@ ${customInstruction ? `Пожелание владельца к ответу: "$
           }),
         });
 
-        targetRepoUrl = `https://github.com/${userData.login}/${cleanRepoName}.git`;
+        if (!targetRepoUrl) {
+          targetRepoUrl = `https://github.com/${userData.login}/${cleanRepoName}.git`;
+        }
       }
 
-      if (!targetRepoUrl) {
-        res.status(400).json({
-          error: 'Укажите URL репозитория (GitHub / GitLab) или введите токен GitHub для автоматического создания репозитория.',
+      // If no cloud token was entered yet, succeed with local + mirror repository push and return step-by-step cloud instructions
+      if (!effectiveToken) {
+        if (targetRepoUrl) {
+          try {
+            execSync('git remote remove origin', { cwd: __dirname, stdio: 'ignore' });
+          } catch {
+            // ignore
+          }
+          execSync(`git remote add origin ${JSON.stringify(targetRepoUrl)}`, { cwd: __dirname });
+        }
+        const updated = getGitStatusAndHistory(__dirname);
+        res.json({
+          ok: true,
+          mirrorOnly: true,
+          pushedTo: targetRepoUrl || `mirror://${cleanRepoName}.git (Локальное зеркало + .git)`,
+          quickTokenUrl:
+            'https://github.com/settings/tokens/new?description=AI+Life+Companion+Petrashev+Viktor&scopes=repo',
+          ...updated,
         });
         return;
       }
 
-      // Inject token into HTTPS remote URL if provided
+      // Inject token into HTTPS remote URL and push to cloud GitHub / GitLab
       let pushUrl = targetRepoUrl;
-      if (token.trim() && pushUrl.startsWith('https://')) {
-        const cleanToken = encodeURIComponent(token.trim());
+      if (effectiveToken && pushUrl.startsWith('https://')) {
+        const cleanToken = encodeURIComponent(effectiveToken);
         if (pushUrl.includes('gitlab.com')) {
           pushUrl = pushUrl.replace('https://', `https://oauth2:${cleanToken}@`);
         } else {
@@ -773,13 +890,14 @@ ${customInstruction ? `Пожелание владельца к ответу: "$
       const updated = getGitStatusAndHistory(__dirname);
       res.json({
         ok: true,
+        mirrorOnly: false,
         pushedTo: targetRepoUrl,
         ...updated,
       });
     } catch (error: unknown) {
       const errMsg = error instanceof Error ? error.message : String(error);
       res.status(500).json({
-        error: `Ошибка при отправке в удалённый репозиторий: ${errMsg}. Проверьте URL и права токена (repo / write_repository).`,
+        error: `Ошибка при отправке в удалённый репозиторий: ${errMsg}. Проверьте URL и права токена (галочка repo).`,
       });
     }
   });
@@ -838,12 +956,10 @@ ${customInstruction ? `Пожелание владельца к ответу: "$
 
       for (const f of files) {
         if (f.relPath === 'index.html' && standaloneHtml) {
-          // Save the raw Vite entry template as index.vite-source.html
           zipEntries.push({
             relPath: 'ai-life-companion/index.vite-source.html',
             data: f.data,
           });
-          // Make index.html 100% playable when double-clicked directly from the unpacked archive!
           zipEntries.push({
             relPath: 'ai-life-companion/index.html',
             data: standaloneHtml,
@@ -856,7 +972,7 @@ ${customInstruction ? `Пожелание владельца к ответу: "$
         }
       }
 
-      // Add 1-click Windows & Mac/Linux launcher scripts
+      // Add 1-click Windows launcher script
       const winBat = `@echo off
 chcp 65001 > nul
 echo ============================================================================
@@ -872,6 +988,28 @@ pause
       zipEntries.push({
         relPath: 'ai-life-companion/START_WINDOWS.bat',
         data: Buffer.from(winBat, 'utf8'),
+      });
+
+      // Add 1-click Windows GitHub Push script (uses standard Windows Git browser login without manual tokens)
+      const pushBat = `@echo off
+chcp 65001 > nul
+echo ============================================================================
+echo Отправка авторского репозитория в GitHub — Петрашев Виктор Владимирович
+echo ============================================================================
+git config user.name "Петрашев Виктор Владимирович"
+git config user.email "petrashev.viktor@gmail.com"
+set /p REPO_URL="Вставьте ссылку на ваш пустой репозиторий GitHub (например https://github.com/ваш-логин/ai-life-companion-petrashev.git): "
+git remote remove origin 2>nul
+git remote add origin %REPO_URL%
+git branch -M main
+git push -u origin main --force
+echo.
+echo Готово! Все коммиты и история Петрашева Виктора Владимировича отправлены в GitHub.
+pause
+`;
+      zipEntries.push({
+        relPath: 'ai-life-companion/PUSH_TO_GITHUB.bat',
+        data: Buffer.from(pushBat, 'utf8'),
       });
 
       const zipBuffer = buildZipBuffer(zipEntries);
