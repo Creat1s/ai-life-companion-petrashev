@@ -1,6 +1,8 @@
 export type Locale = 'ru' | 'en' | 'es';
 export type ThemeMode = 'light' | 'dark';
-export type MainTab = 'home' | 'ai' | 'insights' | 'world' | 'profile';
+export type UIMode = 'user' | 'admin';
+export type DesignStyle = 'game' | 'web3';
+export type MainTab = 'home' | 'ai' | 'insights' | 'world' | 'profile' | 'help';
 
 export type AvatarId = 'lumi' | 'nova' | 'shadow' | 'yobao' | 'bobo' | 'pico' | 'maya' | 'kira' | 'orion' | 'mochi';
 export type CompanionMood = 'happy' | 'calm' | 'curious' | 'tired';
