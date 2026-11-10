@@ -321,6 +321,98 @@ function ensureGitRepoInitialized(rootDir: string) {
   }
 }
 
+const AUTO_PUSH_CONFIG_PATH = path.join('/tmp', '.petrashev-github-autopush.json');
+
+interface AutoPushConfig {
+  provider: 'github' | 'gitlab';
+  targetRepoUrl: string;
+  token: string;
+  updatedAt: string;
+}
+
+function loadAutoPushConfig(): AutoPushConfig | null {
+  try {
+    if (fs.existsSync(AUTO_PUSH_CONFIG_PATH)) {
+      return JSON.parse(fs.readFileSync(AUTO_PUSH_CONFIG_PATH, 'utf8')) as AutoPushConfig;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function saveAutoPushConfig(cfg: AutoPushConfig) {
+  try {
+    fs.writeFileSync(AUTO_PUSH_CONFIG_PATH, JSON.stringify(cfg, null, 2), 'utf8');
+  } catch {
+    // ignore
+  }
+}
+
+function autoCommitAndPushIfChanged(rootDir: string, customMsg?: string) {
+  try {
+    ensureGitRepoInitialized(rootDir);
+    const statusOut = execSync('git status --porcelain', {
+      cwd: rootDir,
+      encoding: 'utf8',
+    }).trim();
+
+    if (statusOut || customMsg) {
+      execSync(`git config user.name "${AUTHOR_NAME}"`, { cwd: rootDir, stdio: 'ignore' });
+      execSync(`git config user.email "${AUTHOR_EMAIL}"`, { cwd: rootDir, stdio: 'ignore' });
+      execSync('git add -A', { cwd: rootDir, stdio: 'ignore' });
+      const msg =
+        customMsg ||
+        `feat(auto-save): Автоматическая фиксация изменений — ${AUTHOR_NAME} (${new Date().toISOString()})`;
+      try {
+        execSync(`git commit -m ${JSON.stringify(msg)}`, { cwd: rootDir, stdio: 'ignore' });
+      } catch {
+        // nothing to commit
+      }
+    }
+
+    // 1. Always push to local bare mirror repository automatically
+    const mirrorDir = path.join('/tmp', 'ai-life-companion-petrashev-mirror.git');
+    if (!fs.existsSync(mirrorDir)) {
+      execSync(`git init --bare ${JSON.stringify(mirrorDir)}`, { stdio: 'ignore' });
+    }
+    try {
+      execSync('git remote remove mirror', { cwd: rootDir, stdio: 'ignore' });
+    } catch {
+      // ignore
+    }
+    execSync(`git remote add mirror ${JSON.stringify(mirrorDir)}`, { cwd: rootDir, stdio: 'ignore' });
+    execSync('git push mirror main --force', { cwd: rootDir, stdio: 'ignore' });
+
+    // 2. If user saved their GitHub/GitLab token once, automatically push to cloud GitHub without asking!
+    const cfg = loadAutoPushConfig();
+    if (cfg && cfg.token && cfg.targetRepoUrl) {
+      let pushUrl = cfg.targetRepoUrl;
+      const cleanToken = encodeURIComponent(cfg.token.trim());
+      if (pushUrl.startsWith('https://')) {
+        if (pushUrl.includes('gitlab.com')) {
+          pushUrl = pushUrl.replace('https://', `https://oauth2:${cleanToken}@`);
+        } else {
+          pushUrl = pushUrl.replace('https://', `https://x-access-token:${cleanToken}@`);
+        }
+      }
+      try {
+        execSync('git remote remove origin', { cwd: rootDir, stdio: 'ignore' });
+      } catch {
+        // ignore
+      }
+      execSync(`git remote add origin ${JSON.stringify(pushUrl)}`, { cwd: rootDir, stdio: 'ignore' });
+      execSync('git push -u origin main --force', { cwd: rootDir, stdio: 'ignore' });
+      execSync(`git remote set-url origin ${JSON.stringify(cfg.targetRepoUrl)}`, {
+        cwd: rootDir,
+        stdio: 'ignore',
+      });
+    }
+  } catch {
+    // ignore background watcher transient errors
+  }
+}
+
 function getGitStatusAndHistory(rootDir: string) {
   ensureGitRepoInitialized(rootDir);
   let commits: {
@@ -358,11 +450,12 @@ function getGitStatusAndHistory(rootDir: string) {
   let remoteUrl = '';
   try {
     remoteUrl = execSync('git remote get-url origin', { cwd: rootDir, encoding: 'utf8' }).trim();
-    // Redact any embedded token in URL for display
     remoteUrl = remoteUrl.replace(/\/\/([^@]+)@/, '//***@');
   } catch {
     remoteUrl = '';
   }
+
+  const autoCfg = loadAutoPushConfig();
 
   // Compute SHA-256 fingerprint of all source files for IP priority proof
   const files = collectProjectFiles(rootDir, false);
@@ -377,7 +470,8 @@ function getGitStatusAndHistory(rootDir: string) {
     authorName: AUTHOR_NAME,
     authorEmail: AUTHOR_EMAIL,
     branch: 'main',
-    remoteUrl,
+    remoteUrl: remoteUrl || autoCfg?.targetRepoUrl || '',
+    autoPushEnabled: Boolean(autoCfg?.token && autoCfg?.targetRepoUrl),
     projectSha256,
     totalFiles: files.length,
     commits,
@@ -455,6 +549,10 @@ async function startServer() {
   const PORT = 3000;
 
   ensureGitRepoInitialized(__dirname);
+  autoCommitAndPushIfChanged(__dirname);
+  setInterval(() => {
+    autoCommitAndPushIfChanged(__dirname);
+  }, 25000);
 
   app.use(express.json({ limit: '4mb' }));
 
@@ -641,7 +739,7 @@ ${customInstruction ? `Пожелание владельца к ответу: "$
     }
   });
 
-  // 8. Create a New Signed Commit Authored by Петрашев Виктор Владимирович
+  // 8. Create a New Signed Commit Authored by Петрашев Виктор Владимирович (with automatic background Push!)
   app.post('/api/git/commit', (req, res) => {
     try {
       ensureGitRepoInitialized(__dirname);
@@ -662,6 +760,9 @@ ${customInstruction ? `Пожелание владельца к ответу: "$
       } catch {
         // allow-empty guarantees commit creation
       }
+
+      // Automatically push to mirror + cloud GitHub if token was connected once
+      autoCommitAndPushIfChanged(__dirname);
 
       const updated = getGitStatusAndHistory(__dirname);
       res.json({ ok: true, ...updated });
@@ -791,9 +892,10 @@ ${customInstruction ? `Пожелание владельца к ответу: "$
         // ignore mirror warnings
       }
 
-      const effectiveToken = (token || process.env.GITHUB_TOKEN || '').trim();
+      const savedCfg = loadAutoPushConfig();
+      const effectiveToken = (token || savedCfg?.token || process.env.GITHUB_TOKEN || '').trim();
       const cleanRepoName = (repoName || 'ai-life-companion-petrashev').trim();
-      let targetRepoUrl = repoUrl.trim();
+      let targetRepoUrl = (repoUrl || savedCfg?.targetRepoUrl || '').trim();
 
       if (!targetRepoUrl && githubUsername.trim()) {
         const cleanUser = githubUsername.trim().replace(/^@/, '');
@@ -886,6 +988,14 @@ ${customInstruction ? `Пожелание владельца к ответу: "$
 
       // Reset stored remote URL to clean URL without token for security
       execSync(`git remote set-url origin ${JSON.stringify(targetRepoUrl)}`, { cwd: __dirname });
+
+      // Persist token & targetRepoUrl so all future changes auto-push in background without asking!
+      saveAutoPushConfig({
+        provider: provider === 'gitlab' ? 'gitlab' : 'github',
+        targetRepoUrl,
+        token: effectiveToken,
+        updatedAt: new Date().toISOString(),
+      });
 
       const updated = getGitStatusAndHistory(__dirname);
       res.json({
