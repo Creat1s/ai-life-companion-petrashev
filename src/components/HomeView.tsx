@@ -20,7 +20,13 @@ import {
   HeartPulse,
   Brain,
   HardDriveDownload,
+  MapPin,
+  Music,
+  Radio,
+  Search,
+  Database,
 } from 'lucide-react';
+import { FreeSuiteTab } from './FreeAiSuiteModal';
 import {
   ApprovalRequest,
   CalendarEvent,
@@ -63,6 +69,7 @@ interface HomeViewProps {
   onGenerateDailyPlan?: () => void;
   onOpenSuperHub?: (tab: SuperHubTab) => void;
   onOpenSourceDownload?: () => void;
+  onOpenFreeSuite?: (tab: FreeSuiteTab) => void;
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({
@@ -89,6 +96,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   onGenerateDailyPlan,
   onOpenSuperHub,
   onOpenSourceDownload,
+  onOpenFreeSuite,
 }) => {
   const t = translations[settings.locale].home;
   const moodLabels = translations[settings.locale].moods;
@@ -136,10 +144,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
       )}
 
       {/* Primary Hero Split: Dominant Companion Anchor + Command Bar & State */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-        {/* Left: Companion Hero Stage (Unboxed, Central Spotlight) */}
-        <div className="lg:col-span-6 flex flex-col justify-between items-center text-center p-3 sm:p-5 relative">
-          <div className="w-full flex items-center justify-between gap-4 mb-2">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch overflow-visible">
+        {/* Left: Companion Hero Stage (Unboxed, Unclipped, Central Spotlight) */}
+        <div className="lg:col-span-6 flex flex-col justify-between items-center text-center p-2 sm:p-4 relative overflow-visible">
+          <div className="w-full flex items-center justify-between gap-4 mb-1 z-20">
             <div className="text-left">
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 {companion.avatarId === 'lumi'
@@ -182,8 +190,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </button>
           </div>
 
-          {/* Freely Floating 3D Companion Centerpiece */}
-          <div className="w-full flex-1 flex items-center justify-center my-2">
+          {/* Freely Floating Unclipped 3D Companion Centerpiece */}
+          <div className="w-full flex-1 flex items-center justify-center my-0 overflow-visible">
             <CompanionCanvas
               avatarId={companion.avatarId}
               mood={companion.mood}
@@ -440,6 +448,105 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   </p>
                 </button>
               </div>
+
+              {/* 100% Free Add-ons Deck (Google Maps, Music Studio, Live Voice, Audio Transcribe, Search, Cloud DB) */}
+              {onOpenFreeSuite && (
+                <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                      Новые подключённые дополнения (100% Бесплатные версии · $0):
+                    </span>
+                    <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                      Free Tier Active
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onOpenFreeSuite('maps')}
+                      className="p-2.5 rounded-xl border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-left transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center gap-1.5 text-purple-700 dark:text-purple-300 font-bold text-xs">
+                        <MapPin className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">Google Карты ($0)</span>
+                      </div>
+                      <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 truncate">
+                        Интерактивная карта + Поиск мест
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onOpenFreeSuite('music')}
+                      className="p-2.5 rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/10 hover:bg-fuchsia-500/20 text-left transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center gap-1.5 text-fuchsia-700 dark:text-fuchsia-300 font-bold text-xs">
+                        <Music className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">Музыка Lyria ($0)</span>
+                      </div>
+                      <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 truncate">
+                        Генератор треков и стихов .WAV
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onOpenFreeSuite('live_voice')}
+                      className="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-left transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300 font-bold text-xs">
+                        <Radio className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">Gemini Live ($0)</span>
+                      </div>
+                      <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 truncate">
+                        Живой голосовой звонок
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onOpenFreeSuite('transcribe')}
+                      className="p-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-left transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center gap-1.5 text-rose-700 dark:text-rose-300 font-bold text-xs">
+                        <Mic className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">Транскрибация ($0)</span>
+                      </div>
+                      <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 truncate">
+                        Gemini 3.5 Transcribe в текст
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onOpenFreeSuite('search')}
+                      className="p-2.5 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-left transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center gap-1.5 text-blue-700 dark:text-blue-300 font-bold text-xs">
+                        <Search className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">Google Поиск ($0)</span>
+                      </div>
+                      <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 truncate">
+                        Свежие факты со ссылками
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onOpenFreeSuite('cloud_db')}
+                      className="p-2.5 rounded-xl border border-teal-500/30 bg-teal-500/10 hover:bg-teal-500/20 text-left transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center gap-1.5 text-teal-700 dark:text-teal-300 font-bold text-xs">
+                        <Database className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">Бесплатная БД ($0)</span>
+                      </div>
+                      <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 truncate">
+                        Облако + Авто-бэкап GitHub
+                      </p>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
