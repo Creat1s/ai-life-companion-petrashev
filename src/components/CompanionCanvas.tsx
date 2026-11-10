@@ -18,6 +18,7 @@ interface CompanionCanvasProps {
   batterySaver: boolean;
   lowMemoryMode: boolean;
   reducedMotion: boolean;
+  showDebugControls?: boolean;
   onTapAvatar?: () => void;
   size?: 'sm' | 'md' | 'lg';
 }
@@ -26,13 +27,13 @@ const AVATAR_LABELS: Record<AvatarId, string> = {
   lumi: 'Люми (3D Морской ангел)',
   nova: 'Нова (3D Космический осьминог)',
   shadow: 'Шэдоу (3D Теневой кот)',
-  yobao: 'Йобао (3D Дух)',
-  bobo: 'Бобо (3D Звезда)',
-  pico: 'Пико (3D Спрайт)',
+  yobao: 'Нова (3D Космический осьминог)',
+  bobo: 'Люми (3D Морской ангел)',
+  pico: 'Шэдоу (3D Теневой кот)',
   kira: 'Кира (3D Облик)',
   orion: 'Орион (3D Облик)',
   mochi: 'Моти (3D Облик)',
-  maya: 'Майя (3D Облик)',
+  maya: 'Нова (3D Космический осьминог)',
 };
 
 const STATE_LABELS_RU: Record<AnimationCue, string> = {
@@ -55,6 +56,7 @@ export const CompanionCanvas: React.FC<CompanionCanvasProps> = ({
   batterySaver,
   lowMemoryMode,
   reducedMotion,
+  showDebugControls = false,
   onTapAvatar,
   size = 'lg',
 }) => {
@@ -68,16 +70,14 @@ export const CompanionCanvas: React.FC<CompanionCanvasProps> = ({
       ? 'w-36 h-36 overflow-visible'
       : size === 'md'
         ? 'w-72 h-72 overflow-visible'
-        : 'w-full min-h-[390px] sm:min-h-[450px] md:min-h-[480px] overflow-visible';
+        : 'w-full min-h-[370px] sm:min-h-[430px] md:min-h-[460px] overflow-visible';
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: 'spring', stiffness: 220, damping: 24 }}
-      className={`relative w-full overflow-visible flex flex-col items-center justify-center select-none ${
-        size === 'sm' ? 'p-0' : 'p-0'
-      }`}
+      className="relative w-full overflow-visible flex flex-col items-center justify-center select-none p-0"
     >
       {/* Dynamic Ambient Room Atmosphere Aura driven by Framer Motion */}
       <motion.div
@@ -119,6 +119,7 @@ export const CompanionCanvas: React.FC<CompanionCanvasProps> = ({
               size={size}
               isListening={animation === 'listen'}
               isSpeaking={isSpeaking}
+              showDebugControls={showDebugControls}
               onTap={onTapAvatar}
             />
           </motion.div>
@@ -169,8 +170,8 @@ export const CompanionCanvas: React.FC<CompanionCanvasProps> = ({
         </AnimatePresence>
       </div>
 
-      {/* State Caption with Framer Motion Layout Transition */}
-      {size !== 'sm' && (
+      {/* State Caption with Framer Motion Layout Transition (Shown ONLY in Admin Mode) */}
+      {size !== 'sm' && showDebugControls && (
         <motion.div
           layout
           className="relative z-20 mt-1 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300"

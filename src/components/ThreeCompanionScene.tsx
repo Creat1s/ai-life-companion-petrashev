@@ -24,6 +24,7 @@ interface ThreeCompanionSceneProps {
   size?: 'sm' | 'md' | 'lg';
   isListening?: boolean;
   isSpeaking?: boolean;
+  showDebugControls?: boolean;
   onTap?: () => void;
   onTapCompanion?: () => void;
 }
@@ -39,6 +40,7 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
   size = 'lg',
   isListening = false,
   isSpeaking = false,
+  showDebugControls = false,
   onTap,
   onTapCompanion,
 }) => {
@@ -611,8 +613,8 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
         title="Нажмите на 3D-персонажа для акробатического прыжка (Framer Motion Spring Physics)"
       />
 
-      {/* Framer Motion Interactive 3D State Switcher + Live Spring Blending Telemetry */}
-      {size !== 'sm' && (
+      {/* Framer Motion Interactive 3D State Switcher (Shown ONLY in Admin Mode) */}
+      {showDebugControls && size !== 'sm' && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
