@@ -74,6 +74,8 @@ export interface UserSettings {
   locale: Locale;
   timezone: string;
   theme: ThemeMode;
+  uiMode?: UIMode;
+  designStyle?: DesignStyle;
   airplaneMode: boolean;
   batterySaver: boolean;
   lowMemoryMode: boolean;
