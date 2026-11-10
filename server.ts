@@ -1082,12 +1082,15 @@ ${customInstruction ? `Пожелание владельца к ответу: "$
         }
       }
 
-      // Add 1-click Windows launcher script
+      // Add 1-click Windows launcher script (with automatic pull from GitHub before start)
       const winBat = `@echo off
 chcp 65001 > nul
 echo ============================================================================
 echo AI Life Companion — Автор идеи и разработки: Петрашев Виктор Владимирович
+echo Репозиторий: https://github.com/Creat1s/ai-life-companion-petrashev.git
 echo ============================================================================
+echo Подтягиваю свежие обновления из вашего GitHub...
+git pull origin main --rebase 2>nul
 echo 1. Если вы хотите просто открыть приложение без установки Node.js —
 echo    дважды кликните по файлу index.html в этой папке!
 echo 2. Запуск полного сервера разработки (Express + Vite + Gemini 4 Argon):
@@ -1100,6 +1103,24 @@ pause
         data: Buffer.from(winBat, 'utf8'),
       });
 
+      // Add real-time PC Auto-Sync watcher script (pulls every 15 seconds from GitHub)
+      const autoSyncBat = `@echo off
+chcp 65001 > nul
+echo ============================================================================
+echo АВТО-СИНХРОНИЗАЦИЯ ПК В РЕАЛЬНОМ ВРЕМЕНИ — Петрашев Виктор Владимирович
+echo Репозиторий: https://github.com/Creat1s/ai-life-companion-petrashev.git
+echo ============================================================================
+git remote set-url origin https://github.com/Creat1s/ai-life-companion-petrashev.git 2>nul
+:loop
+git pull origin main --rebase
+timeout /t 15 /nobreak > nul
+goto loop
+`;
+      zipEntries.push({
+        relPath: 'ai-life-companion/AUTO_SYNC_PC.bat',
+        data: Buffer.from(autoSyncBat, 'utf8'),
+      });
+
       // Add 1-click Windows GitHub Push script (uses standard Windows Git browser login without manual tokens)
       const pushBat = `@echo off
 chcp 65001 > nul
@@ -1108,7 +1129,8 @@ echo Отправка авторского репозитория в GitHub — 
 echo ============================================================================
 git config user.name "Петрашев Виктор Владимирович"
 git config user.email "petrashev.viktor@gmail.com"
-set /p REPO_URL="Вставьте ссылку на ваш пустой репозиторий GitHub (например https://github.com/ваш-логин/ai-life-companion-petrashev.git): "
+set /p REPO_URL="Вставьте ссылку на ваш репозиторий GitHub (по умолчанию https://github.com/Creat1s/ai-life-companion-petrashev.git): "
+if "%REPO_URL%"=="" set REPO_URL=https://github.com/Creat1s/ai-life-companion-petrashev.git
 git remote remove origin 2>nul
 git remote add origin %REPO_URL%
 git branch -M main
