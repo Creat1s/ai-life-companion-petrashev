@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#2563EB"/>
+    </linearGradient>
+  </defs>
+  <!-- Background with safe zone padding -->
+  <rect width="512" height="512" rx="128" fill="url(#bg)"/>
+  
+  <!-- Companion Avatar Icon Silhouette -->
+  <!-- Ears -->
+  <path d="M160 200 L130 90 L220 160 Z" fill="#E07A5F" stroke="#0F172A" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M352 200 L382 90 L292 160 Z" fill="#E07A5F" stroke="#0F172A" stroke-width="8" stroke-linejoin="round"/>
+  
+  <!-- Head -->
+  <rect x="136" y="140" width="240" height="180" rx="88" fill="#E07A5F" stroke="#0F172A" stroke-width="8"/>
+  <rect x="164" y="172" width="184" height="120" rx="56" fill="#FFF8F0"/>
+  
+  <!-- Eyes -->
+  <circle cx="216" cy="226" r="14" fill="#0F172A"/>
+  <circle cx="296" cy="226" r="14" fill="#0F172A"/>
+  <circle cx="221" cy="221" r="5" fill="#FFFFFF"/>
+  <circle cx="301" cy="221" r="5" fill="#FFFFFF"/>
+  
+  <!-- Happy Smile -->
+  <path d="M236 256 Q256 270 276 256" stroke="#0F172A" stroke-width="7" stroke-linecap="round" fill="none"/>
+  
+  <!-- Studio Headphones Overlay -->
+  <path d="M128 220 C128 110, 384 110, 384 220" fill="none" stroke="url(#accent)" stroke-width="18" stroke-linecap="round"/>
+  <rect x="112" y="196" width="32" height="68" rx="16" fill="url(#accent)" stroke="#0F172A" stroke-width="6"/>
+  <rect x="368" y="196" width="32" height="68" rx="16" fill="url(#accent)" stroke="#0F172A" stroke-width="6"/>
+
+  <!-- Body -->
+  <rect x="156" y="300" width="200" height="140" rx="70" fill="#E07A5F" stroke="#0F172A" stroke-width="8"/>
+  <ellipse cx="256" cy="380" rx="60" ry="46" fill="#FFF8F0"/>
+</svg>
