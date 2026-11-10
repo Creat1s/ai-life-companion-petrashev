@@ -5,7 +5,6 @@ import {
   BarChart2,
   Sparkles,
   User,
-  ShieldAlert,
   WifiOff,
   Wifi,
   Smartphone,
@@ -19,6 +18,14 @@ import {
   HardDriveDownload,
   Mic,
   MapPin,
+  HelpCircle,
+  LayoutGrid,
+  Flame,
+  Zap,
+  Trophy,
+  Gamepad2,
+  Layers,
+  Wrench,
 } from 'lucide-react';
 import { PhoneInstallModal } from './components/PhoneInstallModal';
 import { DesignShowcaseModal } from './components/DesignShowcaseModal';
@@ -27,6 +34,8 @@ import { VoiceCommandModal } from './components/VoiceCommandModal';
 import { PhoneSuperHubModal } from './components/PhoneSuperHubModal';
 import { SourceDownloadModal } from './components/SourceDownloadModal';
 import { FreeAiSuiteModal, FreeSuiteTab } from './components/FreeAiSuiteModal';
+import { HelpAndGuideView } from './components/HelpAndGuideView';
+import { UserModulesHubView } from './components/UserModulesHubView';
 import {
   ActionRecord,
   ActiveCallState,
@@ -107,9 +116,21 @@ function loadInitialState(): PersistedState {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<PersistedState>;
+      const mergedCompanion: CompanionState = {
+        ...INITIAL_COMPANION,
+        ...parsed.companion,
+      };
+      // Normalize any legacy non-3D avatarId ('yobao', 'bobo', 'pico', 'maya') to flagship 3D 'nova'
+      if (
+        mergedCompanion.avatarId !== 'lumi' &&
+        mergedCompanion.avatarId !== 'nova' &&
+        mergedCompanion.avatarId !== 'shadow'
+      ) {
+        mergedCompanion.avatarId = 'nova';
+      }
       return {
         settings: { ...INITIAL_SETTINGS, ...parsed.settings },
-        companion: { ...INITIAL_COMPANION, ...parsed.companion },
+        companion: mergedCompanion,
         inventory: parsed.inventory ?? INITIAL_INVENTORY,
         consents: parsed.consents ?? INITIAL_CONSENTS,
         reminders: parsed.reminders ?? INITIAL_REMINDERS,
@@ -422,7 +443,7 @@ export default function App() {
         const initialMsg: ChatMessage = {
           id: assistantId,
           role: 'assistant',
-          text: 'Gemini 4 Argon анализирует контекст...',
+          text: 'Помощник обдумывает ваш запрос...',
           createdAt: new Date().toISOString(),
           route: 'cloud_llm',
           actionId: result.actionRecord?.actionId,
@@ -570,8 +591,8 @@ export default function App() {
     if (isStreaming) stopStreaming(true);
     const promptText =
       settings.locale === 'en'
-        ? 'Generate my personalized Daily Action Plan & Advice with Gemini 4 Argon'
-        : 'Составь мой персональный план дня и рекомендации с Gemini 4 Argon';
+        ? 'Generate my personalized Daily Action Plan & Advice'
+        : 'Составь мой персональный план дня и рекомендации';
 
     const userMsg: ChatMessage = {
       id: `u-plan-${Date.now().toString(36)}`,
@@ -585,7 +606,7 @@ export default function App() {
     const initialMsg: ChatMessage = {
       id: assistantId,
       role: 'assistant',
-      text: 'Gemini 4 Argon анализирует ваши задачи, календарь, здоровье и манеру общения...',
+      text: 'Составляю ваш персональный план дня с учётом задач и расписания...',
       createdAt: new Date().toISOString(),
       route: 'cloud_llm',
       status: 'streaming',
@@ -938,16 +959,44 @@ export default function App() {
   const calendarAllowed = consents.find((c) => c.sourceId === 'calendar')?.allowed ?? false;
   const usageAllowed = consents.find((c) => c.sourceId === 'usageStats')?.allowed ?? false;
 
-  const navItems: { id: MainTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  const isAdmin = settings.uiMode === 'admin';
+  const designStyle = settings.designStyle || 'game';
+  const isGame = designStyle === 'game';
+
+  const userBottomNavItems: {
+    id: MainTab;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }[] = [
+    { id: 'home', label: 'Главная', icon: Home },
+    { id: 'insights', label: 'Разделы', icon: LayoutGrid },
+    { id: 'ai', label: 'Диалог', icon: MessageSquare },
+    { id: 'world', label: 'Мир 3D', icon: Sparkles },
+    { id: 'help', label: 'Помощь', icon: HelpCircle },
+    { id: 'profile', label: 'Профиль', icon: User },
+  ];
+
+  const adminNavItems: {
+    id: MainTab;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }[] = [
     { id: 'home', label: tNav.home, icon: Home },
     { id: 'ai', label: tNav.ai, icon: MessageSquare },
     { id: 'insights', label: tNav.insights, icon: BarChart2 },
     { id: 'world', label: tNav.world, icon: Sparkles },
+    { id: 'help', label: 'Помощь', icon: HelpCircle },
     { id: 'profile', label: tNav.profile, icon: User },
   ];
 
+  const rootBgClass = !isAdmin
+    ? isGame
+      ? 'min-h-screen flex flex-col bg-[#F7F9FA] dark:bg-[#0D131A] text-[#0F172A] dark:text-[#F1F5F9]'
+      : 'min-h-screen flex flex-col bg-gradient-to-br from-slate-100 via-indigo-50/40 to-cyan-50/40 dark:from-[#060814] dark:via-[#0B1026] dark:to-[#071624] text-[#0F172A] dark:text-[#F1F5F9]'
+    : 'min-h-screen flex flex-col bg-[#F6F7F9] dark:bg-[#0B0F17] text-[#0F172A] dark:text-[#F1F5F9]';
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#F6F7F9] dark:bg-[#0B0F17] text-[#0F172A] dark:text-[#F1F5F9]">
+    <div className={rootBgClass}>
       {/* Tier 1 Free Google Maps Demo Key Quota Exceeded Banner */}
       {quotaExceeded && (
         <div
@@ -958,7 +1007,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Global Incoming Call Floating Banner (if call ringing while modal closed) */}
+      {/* Global Incoming Call Floating Banner */}
       {activeCall && !superHubOpen && (
         <div className="bg-emerald-950 border-b border-emerald-500/50 text-white px-4 py-2.5">
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
@@ -997,191 +1046,244 @@ export default function App() {
         </div>
       )}
 
-      {/* Desktop & Mobile Top App Bar */}
-      <header className="sticky top-0 z-30 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-4">
-          {/* Zone 1: Single text element wordmark */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('home')}
-            className="font-display text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100 whitespace-nowrap shrink-0 text-left"
+      {/* ===================================================================== */}
+      {/* USER MODE: COMPACT DUOLINGO / WEB 3.0 STATUS PILL BAR (NO TOP NAVBAR) */}
+      {/* ===================================================================== */}
+      {!isAdmin ? (
+        <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-3.5">
+          <div
+            className={`flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-3xl ${
+              isGame
+                ? 'bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 border-b-4 border-b-slate-300 dark:border-b-slate-950 shadow-sm'
+                : 'bg-white/75 dark:bg-slate-900/65 backdrop-blur-xl border border-indigo-500/20 dark:border-cyan-400/20 shadow-sm'
+            }`}
           >
-            {translations[settings.locale].appName}
-          </button>
-
-          {/* Zone 2: 5 concise single-line nav links (desktop) */}
-          <nav className="hidden md:flex items-center gap-5" aria-label="Main navigation">
-            {navItems.map((item) => (
+            {/* Left: Duolingo-style Gamified Stats (Streak/Level, Energy, XP) */}
+            <div className="flex items-center gap-3 sm:gap-5">
               <button
-                key={item.id}
                 type="button"
-                onClick={() => setActiveTab(item.id)}
-                className={`py-1 text-sm font-medium transition-colors whitespace-nowrap shrink-0 border-b-2 ${
-                  activeTab === item.id
-                    ? 'border-blue-600 text-slate-900 dark:text-white'
-                    : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-                }`}
+                onClick={() => setActiveTab('home')}
+                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-extrabold text-amber-500 cursor-pointer"
+                title="Уровень развития"
               >
-                {item.label}
+                <Flame className="w-4 h-4 fill-amber-500" />
+                <span>Ур. {companion.level}</span>
               </button>
-            ))}
-          </nav>
 
-          {/* Zone 3: Primary Actions */}
-          <div className="flex items-center gap-2 shrink-0">
-            {/* 100% Free AI & Google Maps Studio Button */}
-            <button
-              type="button"
-              onClick={() => {
-                setFreeSuiteTab('maps');
-                setFreeSuiteOpen(true);
-              }}
-              className="min-h-[40px] inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-              title="Бесплатные модули: Google Карты, Поиск, Генератор Музыки Lyria Free, Живой Звонок Gemini Live, Транскрибация и Бесплатная БД"
-            >
-              <MapPin className="w-3.5 h-3.5" />
-              <span>Карты · Музыка · Live ($0)</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('world')}
+                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-extrabold text-sky-500 cursor-pointer"
+                title="Опыт XP для аксессуаров"
+              >
+                <Trophy className="w-4 h-4" />
+                <span>{companion.xp} XP</span>
+              </button>
 
-            {/* Super-Phone Hub Button */}
-            <button
-              type="button"
-              onClick={() => {
-                setSuperHubTab('calls');
-                setSuperHubOpen(true);
-              }}
-              className="min-h-[40px] inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-              title="Звонки, Мессенджеры, Соцсети, Здоровье и Манера речи"
-            >
-              <PhoneCall className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Функции телефона</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('home')}
+                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-extrabold text-emerald-500 cursor-pointer"
+                title="Энергия компаньона"
+              >
+                <Zap className="w-4 h-4 fill-emerald-500" />
+                <span>{companion.energy}%</span>
+              </button>
+            </div>
 
-            {/* Download Full Source ZIP & GitHub Sync */}
-            <button
-              type="button"
-              onClick={() => setSourceDownloadOpen(true)}
-              className="min-h-[40px] inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-              title="Синхронизация с GitHub / GitLab, Свидетельство об авторстве и скачивание полного проекта (.ZIP)"
-            >
-              <HardDriveDownload className="w-4 h-4" />
-              <span className="hidden sm:inline">GitHub / Скачать .ZIP</span>
-            </button>
+            {/* Right: Instant Style Switcher (Game Design vs Web 3.0) + Theme + Help */}
+            <div className="flex items-center gap-2">
+              <div className="inline-flex items-center gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setSettings((s) => ({ ...s, designStyle: 'game' }))}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                    isGame
+                      ? 'bg-[#58CC02] text-white shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                  title="Версия в стилистике Game Design (Duolingo)"
+                >
+                  <Gamepad2 className="w-3.5 h-3.5" />
+                  <span>Game</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSettings((s) => ({ ...s, designStyle: 'web3' }))}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                    !isGame
+                      ? 'bg-gradient-to-r from-indigo-600 to-cyan-500 text-white shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                  title="Версия в стилистике Web 3.0"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>Web 3.0</span>
+                </button>
+              </div>
 
-            {/* Catalog of Design Versions */}
-            <button
-              type="button"
-              onClick={() => setDesignShowcaseOpen(true)}
-              className="min-h-[40px] hidden lg:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-blue-300 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors whitespace-nowrap shrink-0"
-              title="Открыть каталог версий дизайна"
-            >
-              <Palette className="w-4 h-4" />
-              <span>3D-Дизайны</span>
-            </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setSettings((s) => ({ ...s, theme: s.theme === 'dark' ? 'light' : 'dark' }))
+                }
+                aria-label="Сменить тему"
+                className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-center text-slate-700 dark:text-slate-200 cursor-pointer"
+              >
+                {settings.theme === 'dark' ? (
+                  <Sun className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <Moon className="w-4 h-4 text-slate-700" />
+                )}
+              </button>
 
-            {/* Quick Dark/Light Theme Switcher */}
-            <button
-              type="button"
-              onClick={() =>
-                setSettings((s) => ({ ...s, theme: s.theme === 'dark' ? 'light' : 'dark' }))
-              }
-              aria-label="Сменить тему"
-              className="min-h-[40px] inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors whitespace-nowrap shrink-0"
-            >
-              {settings.theme === 'dark' ? (
-                <Sun className="w-4 h-4 text-amber-400" />
-              ) : (
-                <Moon className="w-4 h-4 text-slate-700 dark:text-slate-200" />
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setPhoneInstallModalOpen(true)}
-              className="min-h-[40px] hidden sm:inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors whitespace-nowrap shrink-0"
-              title="Открыть на телефоне"
-            >
-              <Smartphone className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            </button>
+              <button
+                type="button"
+                onClick={() => setSettings((s) => ({ ...s, uiMode: 'admin' }))}
+                title="Переключить в дизайн Админки (для создателя)"
+                className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-center text-slate-400 hover:text-slate-800 dark:hover:text-white cursor-pointer"
+              >
+                <Wrench className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
-      </header>
+      ) : (
+        /* =================================================================== */
+        /* ADMIN MODE: CREATOR TOP HEADER & WORKSPACE RUNTIME STRIP            */
+        /* =================================================================== */
+        <>
+          <header className="sticky top-0 z-30 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-4">
+              <button
+                type="button"
+                onClick={() => setActiveTab('home')}
+                className="font-display text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100 whitespace-nowrap shrink-0 text-left"
+              >
+                {translations[settings.locale].appName} · Админка
+              </button>
 
-      {/* Workspace Runtime Strip */}
-      <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/80 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium text-slate-800 dark:text-slate-200">
-              {settings.airplaneMode
-                ? 'Автономное Офлайн-ядро (Без интернета)'
-                : 'Gemini 4 Argon · Online'}
-            </span>
-            <span aria-hidden="true">·</span>
-            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-              Автор: Петрашев Виктор Владимирович
-            </span>
-            <span aria-hidden="true">·</span>
-            <span>
-              {companion.avatarId === 'lumi'
-                ? 'Люми (3D)'
-                : companion.avatarId === 'nova'
-                  ? 'Нова (3D)'
-                  : companion.avatarId === 'shadow'
-                    ? 'Шэдоу (3D)'
-                    : 'Компаньон'}{' '}
-              Lvl {companion.level}
-            </span>
-            <span aria-hidden="true">·</span>
+              <nav className="hidden md:flex items-center gap-5" aria-label="Main navigation">
+                {adminNavItems.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setActiveTab(item.id)}
+                    className={`py-1 text-sm font-medium transition-colors whitespace-nowrap shrink-0 border-b-2 ${
+                      activeTab === item.id
+                        ? 'border-blue-600 text-slate-900 dark:text-white'
+                        : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </nav>
 
-            {/* Quick Kazakhstan Services Triggers */}
-            <button
-              type="button"
-              onClick={() => {
-                setKzModalTab('emergency');
-                setKzModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-rose-600/10 hover:bg-rose-600/20 text-rose-700 dark:text-rose-400 font-semibold transition-colors cursor-pointer"
-            >
-              <PhoneCall className="w-3 h-3" />
-              <span>112 KZ</span>
-            </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setSettings((s) => ({ ...s, uiMode: 'user' }))}
+                  className="min-h-[40px] inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#58CC02] hover:bg-[#46A302] text-white text-xs font-extrabold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                >
+                  <Gamepad2 className="w-4 h-4" />
+                  <span>Версия Пользователя</span>
+                </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setKzModalTab('taxi');
-                setKzModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-semibold transition-colors cursor-pointer"
-            >
-              <Car className="w-3 h-3" />
-              <span>Такси KZ</span>
-            </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFreeSuiteTab('maps');
+                    setFreeSuiteOpen(true);
+                  }}
+                  className="min-h-[40px] inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                >
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span className="hidden xl:inline">Карты · Музыка · Live ($0)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSourceDownloadOpen(true)}
+                  className="min-h-[40px] inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                >
+                  <HardDriveDownload className="w-4 h-4" />
+                  <span className="hidden sm:inline">GitHub / .ZIP</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDesignShowcaseOpen(true)}
+                  className="min-h-[40px] hidden lg:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-blue-300 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-xs font-semibold"
+                >
+                  <Palette className="w-4 h-4" />
+                  <span>3D-Дизайны</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPhoneInstallModalOpen(true)}
+                  className="min-h-[40px] hidden sm:inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-xs font-medium"
+                  title="Открыть на телефоне"
+                >
+                  <Smartphone className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/80 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  Режим Создателя · Автор: Петрашев Виктор Владимирович
+                </span>
+                <span aria-hidden="true">·</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setKzModalTab('emergency');
+                    setKzModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-rose-600/10 text-rose-700 dark:text-rose-400 font-semibold cursor-pointer"
+                >
+                  <PhoneCall className="w-3 h-3" />
+                  <span>112 KZ</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setKzModalTab('taxi');
+                    setKzModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 font-semibold cursor-pointer"
+                >
+                  <Car className="w-3 h-3" />
+                  <span>Такси KZ</span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setSettings((s) => ({ ...s, airplaneMode: !s.airplaneMode }))
+                }
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer"
+              >
+                {settings.airplaneMode ? (
+                  <WifiOff className="w-3.5 h-3.5 text-amber-600" />
+                ) : (
+                  <Wifi className="w-3.5 h-3.5 text-teal-600" />
+                )}
+                <span>{settings.airplaneMode ? 'Офлайн ВКЛ' : 'Онлайн'}</span>
+              </button>
+            </div>
           </div>
+        </>
+      )}
 
-          <button
-            type="button"
-            onClick={() =>
-              setSettings((s) => ({ ...s, airplaneMode: !s.airplaneMode }))
-            }
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
-          >
-            {settings.airplaneMode ? (
-              <WifiOff className="w-3.5 h-3.5 text-amber-600" />
-            ) : (
-              <Wifi className="w-3.5 h-3.5 text-teal-600" />
-            )}
-            <span>
-              {settings.airplaneMode
-                ? 'Режим без интернета (ВКЛ)'
-                : 'Интернет активен (Переключить в Офлайн)'}
-            </span>
-          </button>
-        </div>
-      </div>
-
-      {/* Main Content Canvas */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-10">
+      {/* Main Content Canvas (with generous bottom padding for the Bottom Navbar) */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 pb-28">
         {activeTab === 'home' && (
           <HomeView
             companion={companion}
@@ -1248,19 +1350,59 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'insights' && (
-          <InsightsView
-            activity={INITIAL_ACTIVITY}
-            usageAllowed={usageAllowed}
-            settings={settings}
-            companion={companion}
-            reminders={reminders}
-            onChangeWidgetType={(widgetType) =>
-              setSettings((s) => ({ ...s, widgetType }))
-            }
-            onNavigate={setActiveTab}
-          />
-        )}
+        {activeTab === 'insights' &&
+          (!isAdmin ? (
+            <UserModulesHubView
+              settings={settings}
+              companion={companion}
+              reminders={reminders}
+              calendar={INITIAL_CALENDAR}
+              calendarAllowed={calendarAllowed}
+              activity={INITIAL_ACTIVITY}
+              usageAllowed={usageAllowed}
+              messengerThreads={messengerThreads}
+              health={health}
+              persona={persona}
+              onUpdateSettings={(patch) =>
+                setSettings((s) => ({ ...s, ...patch }))
+              }
+              onNavigate={setActiveTab}
+              onOpenSuperHub={(tab) => {
+                setSuperHubTab(tab);
+                setSuperHubOpen(true);
+              }}
+              onOpenFreeSuite={(tab) => {
+                setFreeSuiteTab(tab);
+                setFreeSuiteOpen(true);
+              }}
+              onOpenKzModal={(tab) => {
+                setKzModalTab(tab);
+                setKzModalOpen(true);
+              }}
+              onCreateReminderForm={handleCreateReminderForm}
+              onToggleReminder={(id) =>
+                setReminders((prev) =>
+                  prev.map((r) => (r.id === id ? { ...r, completed: !r.completed } : r))
+                )
+              }
+              onDeleteReminder={(id) =>
+                setReminders((prev) => prev.filter((r) => r.id !== id))
+              }
+              onGenerateDailyPlan={handleGenerateDailyPlan}
+            />
+          ) : (
+            <InsightsView
+              activity={INITIAL_ACTIVITY}
+              usageAllowed={usageAllowed}
+              settings={settings}
+              companion={companion}
+              reminders={reminders}
+              onChangeWidgetType={(widgetType) =>
+                setSettings((s) => ({ ...s, widgetType }))
+              }
+              onNavigate={setActiveTab}
+            />
+          ))}
 
         {activeTab === 'world' && (
           <WorldView
@@ -1269,6 +1411,24 @@ export default function App() {
             inventory={inventory}
             onDispatchCompanion={dispatchCompanion}
             onUnlockOrToggleItem={handleUnlockOrToggleItem}
+          />
+        )}
+
+        {activeTab === 'help' && (
+          <HelpAndGuideView
+            settings={settings}
+            onUpdateSettings={(patch) =>
+              setSettings((s) => ({ ...s, ...patch }))
+            }
+            onNavigate={setActiveTab}
+            onOpenSuperHub={(tab) => {
+              setSuperHubTab(tab);
+              setSuperHubOpen(true);
+            }}
+            onOpenFreeSuite={(tab) => {
+              setFreeSuiteTab(tab);
+              setFreeSuiteOpen(true);
+            }}
           />
         )}
 
@@ -1310,36 +1470,49 @@ export default function App() {
             }
             onExportData={handleExportData}
             onResetAll={handleResetAll}
+            onNavigate={setActiveTab}
           />
         )}
       </main>
 
-      {/* Mobile Bottom Tab Bar */}
+      {/* ===================================================================== */}
+      {/* UNIVERSAL BOTTOM-ONLY NAVIGATION BAR IN USER MODE (MOBILE & DESKTOP)  */}
+      {/* ===================================================================== */}
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 h-16 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 grid grid-cols-5 items-center"
-        aria-label="Mobile navigation"
+        className={
+          !isAdmin
+            ? isGame
+              ? 'fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border-t-2 border-slate-200 dark:border-slate-800 px-2 py-1.5'
+              : 'fixed bottom-3 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-3xl rounded-3xl bg-white/85 dark:bg-slate-950/80 backdrop-blur-2xl border border-indigo-500/25 dark:border-cyan-400/25 shadow-[0_16px_40px_-10px_rgba(79,70,229,0.35)] px-3 py-1.5'
+            : 'md:hidden fixed bottom-0 left-0 right-0 z-40 h-16 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-2'
+        }
+        aria-label="Нижняя панель навигации"
       >
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = activeTab === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setActiveTab(item.id)}
-              className={`min-h-[44px] flex flex-col items-center justify-center transition-colors ${
-                active
-                  ? 'text-blue-600 dark:text-blue-400'
-                  : 'text-slate-500 dark:text-slate-400'
-              }`}
-            >
-              <Icon className="w-5 h-5" />
-              <span className="text-[10px] font-medium tracking-tight mt-1 truncate max-w-[64px]">
-                {item.label}
-              </span>
-            </button>
-          );
-        })}
+        <div className="max-w-3xl mx-auto grid grid-cols-6 gap-1 items-center">
+          {userBottomNavItems.map((item) => {
+            const Icon = item.icon;
+            const active = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveTab(item.id)}
+                className={`min-h-[50px] flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer ${
+                  active
+                    ? isGame
+                      ? 'bg-[#1CB0F6]/15 text-[#1CB0F6] border-2 border-[#1CB0F6]/40 font-extrabold'
+                      : 'bg-gradient-to-r from-indigo-600/20 to-cyan-500/20 text-indigo-600 dark:text-cyan-300 border border-cyan-400/30 font-bold'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="text-[10px] sm:text-xs tracking-tight mt-0.5 truncate max-w-[72px]">
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </nav>
 
       {/* Approval Center Modal */}
