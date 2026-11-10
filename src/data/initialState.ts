@@ -1,0 +1,713 @@
+import {
+  ActionRecord,
+  ActivitySummary,
+  CalendarEvent,
+  ChatMessage,
+  CompanionState,
+  ConsentGrant,
+  ContactItem,
+  HealthWellnessState,
+  IntegrationCapability,
+  InventoryItem,
+  MemoryFact,
+  MessengerThreadItem,
+  OfflinePack,
+  PersonaTrainingConfig,
+  ReminderItem,
+  SocialMediaAsset,
+  SocialPostDraft,
+  TestCommandPreset,
+  UserSettings,
+} from '../types/companion';
+
+export const INITIAL_SETTINGS: UserSettings = {
+  locale: 'ru',
+  timezone: 'Asia/Almaty',
+  theme: 'dark',
+  airplaneMode: false,
+  batterySaver: false,
+  lowMemoryMode: false,
+  reducedMotion: false,
+  killSwitchActive: false,
+  ttsMuted: false,
+  widgetType: 'companion_status',
+};
+
+export const INITIAL_COMPANION: CompanionState = {
+  avatarId: 'lumi',
+  mood: 'happy',
+  energy: 92,
+  bond: 80,
+  xp: 180,
+  level: 3,
+  animation: 'idle',
+  room: 'studio',
+  lastActiveAt: '2026-11-10T07:45:00+05:00',
+  daysAwaySimulated: 0,
+  highScoreMiniGame: 18,
+  gamesPlayed: 4,
+  version: 1,
+};
+
+export const INITIAL_INVENTORY: InventoryItem[] = [
+  {
+    itemId: 'acc_glasses',
+    slot: 'glasses',
+    name: { ru: 'Очки инженера', en: 'Studio Glasses', es: 'Gafas de estudio' },
+    costXp: 0,
+    compatibleAvatars: ['lumi', 'nova', 'shadow', 'yobao', 'bobo', 'pico', 'maya', 'kira', 'orion', 'mochi'],
+    owned: true,
+    equipped: false,
+  },
+  {
+    itemId: 'acc_headphones',
+    slot: 'headphones',
+    name: { ru: 'Аудио-мониторы', en: 'Studio Headphones', es: 'Auriculares' },
+    costXp: 60,
+    compatibleAvatars: ['lumi', 'nova', 'shadow', 'yobao', 'bobo', 'pico', 'maya', 'kira', 'orion', 'mochi'],
+    owned: true,
+    equipped: true,
+  },
+  {
+    itemId: 'acc_scarf',
+    slot: 'scarf',
+    name: { ru: 'Тёплый шарф', en: 'Cozy Scarf', es: 'Bufanda cálida' },
+    costXp: 90,
+    compatibleAvatars: ['lumi', 'nova', 'shadow', 'yobao', 'bobo', 'pico', 'maya', 'kira', 'orion', 'mochi'],
+    owned: false,
+    equipped: false,
+  },
+  {
+    itemId: 'acc_sprout',
+    slot: 'hat',
+    name: { ru: 'Росток фокуса', en: 'Focus Sprout', es: 'Brote de enfoque' },
+    costXp: 120,
+    compatibleAvatars: ['lumi', 'nova', 'shadow', 'yobao', 'bobo', 'pico', 'maya', 'kira', 'orion', 'mochi'],
+    owned: false,
+    equipped: false,
+  },
+];
+
+export const INITIAL_CONSENTS: ConsentGrant[] = [
+  {
+    sourceId: 'contactsCalls',
+    label: {
+      ru: 'Книга контактов и Голосовые звонки',
+      en: 'Contacts Book & Voice Calls',
+      es: 'Contactos y Llamadas de Voz',
+    },
+    description: {
+      ru: 'Голосовой набор по имени контакта и приём входящих звонков голосовым согласием («Принять» / «Отклонить»)',
+      en: 'Voice dial contacts by name and answer incoming calls by voice consent',
+      es: 'Llamar contactos por voz y responder llamadas entrantes con voz',
+    },
+    scope: 'contacts.read, telecom.call, telecom.answerVoice',
+    allowed: true,
+    issuedAt: '2026-11-10T07:00:00Z',
+    revokedAt: null,
+    version: 1,
+  },
+  {
+    sourceId: 'messengers',
+    label: {
+      ru: 'Мессенджеры (WhatsApp, Telegram, Direct, SMS)',
+      en: 'Messengers (WhatsApp, Telegram, Direct, SMS)',
+      es: 'Mensajeros (WhatsApp, Telegram, Direct, SMS)',
+    },
+    description: {
+      ru: 'Чтение входящих сообщений, подготовка ИИ-ответа и отправка после подтверждения или голосовой диктовки владельца',
+      en: 'Read incoming messages, draft AI replies, and send upon owner confirmation or voice dictation',
+      es: 'Leer mensajes, preparar respuestas IA y enviar tras confirmación',
+    },
+    scope: 'messenger.read, messenger.replyWithConfirmation',
+    allowed: true,
+    issuedAt: '2026-11-10T07:00:00Z',
+    revokedAt: null,
+    version: 1,
+  },
+  {
+    sourceId: 'socialMedia',
+    label: {
+      ru: 'Соцсети и Галерея медиа (Посты / Сторис / Reels)',
+      en: 'Social Media & Gallery (Posts / Stories / Reels)',
+      es: 'Redes Sociales y Galería (Posts / Stories / Reels)',
+    },
+    description: {
+      ru: 'Подбор фото/видео/файлов из галереи, генерация постов и публикация строго по голосовому или кнопочному разрешению',
+      en: 'Select photos/videos/files, write posts, and publish only with voice or button confirmation',
+      es: 'Seleccionar fotos/videos, redactar posts y publicar con permiso',
+    },
+    scope: 'media.gallery, social.draft, social.publishConfirmed',
+    allowed: true,
+    issuedAt: '2026-11-10T07:00:00Z',
+    revokedAt: null,
+    version: 1,
+  },
+  {
+    sourceId: 'healthSensors',
+    label: {
+      ru: 'Мониторинг здоровья и психологического состояния',
+      en: 'Health & Psychological Wellness Sensors',
+      es: 'Monitoreo de Salud y Estado Psicológico',
+    },
+    description: {
+      ru: 'Отслеживание пульса, уровня стресса, сна, эмоционального фона и проактивная поддержка 24/7 (включая офлайн)',
+      en: 'Track heart rate, stress, sleep, emotional tone, and proactive encouragement 24/7',
+      es: 'Seguir pulso, estrés, sueño y apoyo emocional proactivo',
+    },
+    scope: 'health.vitals, wellness.support',
+    allowed: true,
+    issuedAt: '2026-11-10T07:00:00Z',
+    revokedAt: null,
+    version: 1,
+  },
+  {
+    sourceId: 'deviceControl',
+    label: {
+      ru: 'Полный доступ к функциям телефона (с согласия владельца)',
+      en: 'Full Phone Capabilities (Owner Consent)',
+      es: 'Acceso Completo al Teléfono (Con Consentimiento)',
+    },
+    description: {
+      ru: 'Управление системными функциями смартфона, будильниками, навигацией, вызовами, такси и офлайн-ядром',
+      en: 'Manage system smartphone functions, alarms, navigation, calls, taxi, and offline core',
+      es: 'Control de funciones del sistema con permiso del propietario',
+    },
+    scope: 'device.fullAccess.ownerApproved',
+    allowed: true,
+    issuedAt: '2026-11-10T07:00:00Z',
+    revokedAt: null,
+    version: 1,
+  },
+  {
+    sourceId: 'calendar',
+    label: { ru: 'Локальный календарь', en: 'Device Calendar', es: 'Calendario local' },
+    description: {
+      ru: 'Чтение событий на сегодня и создание встреч только с подтверждением',
+      en: 'Read today’s events and create events only after approval',
+      es: 'Leer eventos de hoy y crear tras aprobación',
+    },
+    scope: 'calendar.read, calendar.event.create',
+    allowed: true,
+    issuedAt: '2026-11-10T07:00:00Z',
+    revokedAt: null,
+    version: 1,
+  },
+  {
+    sourceId: 'usageStats',
+    label: { ru: 'Экранное время (UsageStats)', en: 'Screen Time (UsageStats)', es: 'Tiempo de uso' },
+    description: {
+      ru: 'Локальная агрегация времени по категориям без выгрузки в облако',
+      en: 'On-device category aggregation without cloud upload',
+      es: 'Agregación local por categorías sin subir a la nube',
+    },
+    scope: 'usage.summary',
+    allowed: true,
+    issuedAt: '2026-11-10T07:00:00Z',
+    revokedAt: null,
+    version: 1,
+  },
+  {
+    sourceId: 'notifications',
+    label: { ru: 'Метаданные уведомлений (P1)', en: 'Notification Metadata (P1)', es: 'Notificaciones (P1)' },
+    description: {
+      ru: 'Краткие сводки и черновики ответов только при наличии системного RemoteInput',
+      en: 'Brief summaries and reply drafts only when platform RemoteInput exists',
+      es: 'Resúmenes y borradores solo con RemoteInput',
+    },
+    scope: 'notification.read, message.replyDraft',
+    allowed: true,
+    issuedAt: '2026-11-10T07:00:00Z',
+    revokedAt: null,
+    version: 1,
+  },
+  {
+    sourceId: 'cloudAi',
+    label: { ru: 'Облачный AI-маршрутизатор (Gemini 4 Argon)', en: 'Cloud AI Router (Gemini 4 Argon)', es: 'Router de IA en la nube' },
+    description: {
+      ru: 'Умный диалог, автоанализ контекста жизни, генерация постов и планов дня',
+      en: 'Smart dialogue, life context analysis, post & daily plan generation',
+      es: 'Diálogo inteligente y generación de planes',
+    },
+    scope: 'ai.cloud.stream',
+    allowed: true,
+    issuedAt: '2026-11-10T07:00:00Z',
+    revokedAt: null,
+    version: 1,
+  },
+  {
+    sourceId: 'offlineStt',
+    label: { ru: 'Голосовое управление и Офлайн-голос (STT/TTS)', en: 'Voice Control & Offline STT/TTS', es: 'Control por Voz Offline' },
+    description: {
+      ru: 'Голосовые команды, принятие звонков голосом, диктовка ответов и подтверждение публикаций',
+      en: 'Voice commands, answering calls by voice, dictating replies, and confirming posts',
+      es: 'Comandos de voz, responder llamadas y dictar respuestas',
+    },
+    scope: 'voice.pushToTalk, voice.confirmation',
+    allowed: true,
+    issuedAt: '2026-11-10T07:00:00Z',
+    revokedAt: null,
+    version: 1,
+  },
+];
+
+export const INITIAL_CONTACTS: ContactItem[] = [
+  {
+    id: 'c-1',
+    name: 'Мама',
+    relation: 'Семья · Избранный контакт',
+    phone: '+77015551234',
+    avatarColor: 'from-rose-500 to-pink-600',
+    favorite: true,
+  },
+  {
+    id: 'c-2',
+    name: 'Андрей К.',
+    relation: 'Коллега · Tech Lead',
+    phone: '+77074448899',
+    avatarColor: 'from-blue-500 to-indigo-600',
+    favorite: true,
+  },
+  {
+    id: 'c-3',
+    name: 'Елена В.',
+    relation: 'Продукт-дизайнер',
+    phone: '+77023337711',
+    avatarColor: 'from-purple-500 to-violet-600',
+    favorite: true,
+  },
+  {
+    id: 'c-4',
+    name: 'Арман (Бро)',
+    relation: 'Лучший друг · Алматы',
+    phone: '+77089990011',
+    avatarColor: 'from-emerald-500 to-teal-600',
+    favorite: true,
+  },
+  {
+    id: 'c-5',
+    name: 'Шеф (Данияр)',
+    relation: 'Руководитель проекта',
+    phone: '+77017776655',
+    avatarColor: 'from-amber-500 to-orange-600',
+    favorite: false,
+  },
+  {
+    id: 'c-6',
+    name: 'Доктор Айболат',
+    relation: 'Семейный врач · Клиника',
+    phone: '+77272500000',
+    avatarColor: 'from-cyan-500 to-blue-600',
+    favorite: false,
+  },
+];
+
+export const INITIAL_MESSENGER_THREADS: MessengerThreadItem[] = [
+  {
+    id: 'm-1',
+    app: 'WhatsApp',
+    senderName: 'Мама',
+    senderHandle: '+7 701 555 1234',
+    incomingText: 'Солнышко, ты сегодня пообедал? Во сколько освободишься вечером?',
+    receivedAt: '10:42',
+    aiDraftReply: 'Мамуль, всё отлично, уже пообедал! Освобожусь около 19:00 и сразу наберу тебя ❤️',
+    status: 'pending_confirm',
+  },
+  {
+    id: 'm-2',
+    app: 'Telegram',
+    senderName: 'Андрей К.',
+    senderHandle: '@andrey_dev',
+    incomingText: 'Привет! Скинь, пожалуйста, статус по новой 3D-сцене и подключению Gemini 4 Argon, клиент спрашивает.',
+    receivedAt: '10:55',
+    aiDraftReply: 'Привет, Андрей! 3D-персонажи и Gemini 4 Argon уже в проде, всё летает. Через 15 минут скину финальный отчёт.',
+    status: 'pending_confirm',
+  },
+  {
+    id: 'm-3',
+    app: 'Instagram Direct',
+    senderName: 'Елена В.',
+    senderHandle: '@elena.design',
+    incomingText: 'Когда выложим новый Reels с нашим AI-компаньоном? Видео уже отрендерили!',
+    receivedAt: '11:02',
+    aiDraftReply: 'Лена, супер! Мой ИИ-помощник уже подобрал обложку, хештеги и текст. Сейчас подтвержу публикацию и выкладываем!',
+    status: 'pending_confirm',
+  },
+  {
+    id: 'm-4',
+    app: 'Telegram',
+    senderName: 'Арман (Бро)',
+    senderHandle: '@arman_kz',
+    incomingText: 'Брат, вечером в 20:00 собираемся в центре на кофе или кальян. Ты с нами?',
+    receivedAt: '11:05',
+    aiDraftReply: 'Бро, железно в теме! К 20:00 подскачу, вызову такси через голосовую команду.',
+    status: 'pending_confirm',
+  },
+];
+
+export const INITIAL_SOCIAL_ASSETS: SocialMediaAsset[] = [
+  {
+    id: 'media-1',
+    type: 'video',
+    title: 'Reels: 3D-компаньон Люми и Голосовой ИИ в действии',
+    subtitle: '4K 60fps · Вертикальное видео 9:16 · 00:24',
+    previewGradient: 'from-cyan-500 via-blue-600 to-indigo-700',
+    badge: 'Видео Reels (MP4)',
+  },
+  {
+    id: 'media-2',
+    type: 'photo',
+    title: 'Фото: Вечерний Алматы — вид на горы Заилийского Алатау',
+    subtitle: 'RAW / HDR · 4032×3024 · Геометка: Almaty',
+    previewGradient: 'from-amber-500 via-rose-500 to-purple-700',
+    badge: 'Фото (HDR)',
+  },
+  {
+    id: 'media-3',
+    type: 'video',
+    title: 'Сторис: Рабочий сетап + AI-план дня Gemini 4 Argon',
+    subtitle: '1080×1920 · С озвучкой и субтитрами · 00:15',
+    previewGradient: 'from-purple-600 via-fuchsia-600 to-pink-600',
+    badge: 'Сторис (Видео)',
+  },
+  {
+    id: 'media-4',
+    type: 'file',
+    title: 'Презентация: Архитектура AI Life Companion 2026.pdf',
+    subtitle: 'PDF-документ · 4.2 МБ · Для Telegram / VK',
+    previewGradient: 'from-emerald-600 via-teal-600 to-cyan-700',
+    badge: 'Файл / Документ',
+  },
+];
+
+export const INITIAL_SOCIAL_DRAFTS: SocialPostDraft[] = [
+  {
+    id: 'post-1',
+    platform: 'Instagram',
+    format: 'Reels / Клип',
+    topic: 'Запуск 3D ИИ-компаньона с голосовым управлением телефоном',
+    caption:
+      'Мой новый 3D ИИ-помощник на базе Gemini 4 Argon сам отвечает в мессенджерах, принимает звонки по голосу и следит за моим состоянием даже без интернета! Как вам такой уровень технологий? 🚀✨',
+    hashtags: ['#AI', '#Gemini4Argon', '#Almaty', '#Tech2026', '#3DCompanion', '#ReelsKZ'],
+    selectedMediaIds: ['media-1', 'media-2'],
+    status: 'awaiting_confirmation',
+  },
+];
+
+export const INITIAL_HEALTH_STATE: HealthWellnessState = {
+  heartRateBpm: 72,
+  stressPercent: 28,
+  sleepHours: 7.5,
+  waterGlasses: 5,
+  psychMood: 'calm',
+  lastCheckInAt: '2026-11-10T09:00:00+05:00',
+  latestEncouragement:
+    'Твой пульс и уровень стресса в норме (72 уд/мин). Ты отлично справляешься с задачами сегодня! Не забудь выпить стакан воды и сделать 2 минуты разминки для глаз.',
+};
+
+export const INITIAL_PERSONA_TRAINING: PersonaTrainingConfig = {
+  stylePreset: 'friendly',
+  allowProfanity: false,
+  ownerAddress: 'Шеф',
+  customCatchphrases: ['Железно сделаем', 'Всё под контролем', 'Летим дальше'],
+  customBehaviorPrompt: 'Отвечай живо, с юмором и максимальной поддержкой владельца.',
+  learnedRules: [
+    {
+      id: 'rule-1',
+      whenUserSays: 'Как дела',
+      assistantReplies: 'Всё по кайфу, Шеф! Системы заряжены на 100%, готов разнести любые задачи!',
+    },
+  ],
+};
+
+export const INITIAL_REMINDERS: ReminderItem[] = [
+  {
+    id: 'r-101',
+    title: 'Проверить релизный чек-лист Android',
+    at: '2026-11-10T14:30:00+05:00',
+    timezone: 'Asia/Almaty',
+    completed: false,
+    source: 'form',
+    createdAt: '2026-11-10T07:10:00+05:00',
+  },
+  {
+    id: 'r-102',
+    title: 'Созвон по архитектуре Room & Hilt',
+    at: '2026-11-10T17:00:00+05:00',
+    timezone: 'Asia/Almaty',
+    completed: false,
+    source: 'text',
+    createdAt: '2026-11-10T07:20:00+05:00',
+  },
+];
+
+export const INITIAL_CALENDAR: CalendarEvent[] = [
+  {
+    id: 'cal-1',
+    title: 'Синхронизация команды мобильной разработки',
+    start: '11:00',
+    end: '11:45',
+    participant: 'Андрей К., Елена В.',
+    location: 'Meet / Studio',
+  },
+  {
+    id: 'cal-2',
+    title: 'Ревью метрик Macrobenchmark',
+    start: '15:30',
+    end: '16:15',
+    participant: 'Андрей К.',
+    location: 'Локально',
+  },
+  {
+    id: 'cal-3',
+    title: 'Вечерняя прогулка без экрана',
+    start: '19:30',
+    end: '20:15',
+    location: 'Парк',
+  },
+];
+
+export const INITIAL_MEMORIES: MemoryFact[] = [
+  {
+    id: 'mem-1',
+    category: 'preferences',
+    value: 'Предпочитает краткие ответы без лишнего текста',
+    source: 'Подтверждено пользователем',
+    confidence: 0.98,
+    createdAt: '2026-11-08T10:00:00Z',
+    expiresAt: null,
+  },
+  {
+    id: 'mem-2',
+    category: 'schedule',
+    value: 'Основной часовой пояс: Asia/Almaty (UTC+5)',
+    source: 'Системные настройки',
+    confidence: 1.0,
+    createdAt: '2026-11-01T08:00:00Z',
+    expiresAt: null,
+  },
+  {
+    id: 'mem-3',
+    category: 'context',
+    value: 'Контакт «Андрей» — коллега по Android-проекту',
+    source: 'Календарь',
+    confidence: 0.92,
+    createdAt: '2026-11-09T12:15:00Z',
+    expiresAt: null,
+  },
+];
+
+export const INITIAL_ACTIVITY: ActivitySummary = {
+  sourceId: 'usageStats',
+  updatedAt: '2026-11-10T07:40:00+05:00',
+  coveragePercent: 96,
+  comparison7dPercent: -12,
+  categories: [
+    {
+      id: 'work',
+      label: { ru: 'Работа и заметки', en: 'Work & Notes', es: 'Trabajo y notas' },
+      minutesToday: 95,
+      minutes7d: 740,
+      minutes30d: 2940,
+      color: '#2563EB',
+    },
+    {
+      id: 'comm',
+      label: { ru: 'Общение', en: 'Communication', es: 'Comunicación' },
+      minutesToday: 42,
+      minutes7d: 310,
+      minutes30d: 1280,
+      color: '#0D9488',
+    },
+    {
+      id: 'media',
+      label: { ru: 'Видео и медиа', en: 'Media & Video', es: 'Media y video' },
+      minutesToday: 38,
+      minutes7d: 295,
+      minutes30d: 1410,
+      color: '#D97706',
+    },
+    {
+      id: 'utils',
+      label: { ru: 'Утилиты и навигация', en: 'Utilities', es: 'Utilidades' },
+      minutesToday: 19,
+      minutes7d: 140,
+      minutes30d: 580,
+      color: '#64748B',
+    },
+  ],
+};
+
+export const INITIAL_PACKS: OfflinePack[] = [
+  {
+    packId: 'stt-ru-kz',
+    name: { ru: 'Голосовой пакет STT (RU)', en: 'Voice Pack STT (RU)', es: 'Paquete de voz (RU)' },
+    version: '1.2.0',
+    sizeMb: 44,
+    checksum: 'sha256:9f2a...b84c',
+    status: 'installed',
+    requiredRamGb: 4,
+  },
+  {
+    packId: 'stt-en-us',
+    name: { ru: 'Голосовой пакет STT (EN)', en: 'Voice Pack STT (EN)', es: 'Paquete de voz (EN)' },
+    version: '1.2.0',
+    sizeMb: 38,
+    checksum: 'sha256:3c71...11d9',
+    status: 'available',
+    requiredRamGb: 4,
+  },
+  {
+    packId: 'llm-nano-q4',
+    name: { ru: 'Локальное Офлайн-ядро ИИ (Q4 Autonomous)', en: 'Local Offline AI Core (Q4)', es: 'LLM Local Offline (Q4)' },
+    version: '2.0.0',
+    sizeMb: 640,
+    checksum: 'sha256:7e04...f2a1',
+    status: 'installed',
+    requiredRamGb: 4,
+  },
+];
+
+export const INITIAL_INTEGRATIONS: IntegrationCapability[] = [
+  {
+    id: 'local_reminders',
+    name: 'Local Alarms & Reminders',
+    releaseTier: 'P0',
+    status: 'connected',
+    capabilities: {
+      ru: 'Создание и просмотр напоминаний полностью в офлайне',
+      en: 'Create and list reminders completely offline',
+      es: 'Crear y listar recordatorios sin conexión',
+    },
+    limitations: {
+      ru: 'Точность будильников зависит от системного разрешения SCHEDULE_EXACT_ALARM',
+      en: 'Exact timing relies on OS exact alarm permission',
+      es: 'La precisión depende del permiso de alarmas del sistema',
+    },
+    rateLimit: 'Local unlimited',
+    tokenHealth: 'ok',
+  },
+  {
+    id: 'telecom_contacts',
+    name: 'Voice Dialer & Call Answer Engine',
+    releaseTier: 'P0',
+    status: 'connected',
+    capabilities: {
+      ru: 'Голосовой вызов по книге контактов и приём входящего звонка голосовым согласием',
+      en: 'Voice call from contacts and answer incoming calls by voice consent',
+      es: 'Llamada por voz desde contactos y respuesta por voz',
+    },
+    limitations: {
+      ru: 'Работает с согласия владельца через системный TelecomManager (в т.ч. без интернета)',
+      en: 'Works with owner consent via TelecomManager (including offline)',
+      es: 'Funciona con permiso del propietario incluso sin internet',
+    },
+    rateLimit: 'Real-time',
+    tokenHealth: 'ok',
+  },
+  {
+    id: 'notifications_remote',
+    name: 'Messenger Auto-Reply & Voice Dictation',
+    releaseTier: 'P1',
+    status: 'connected',
+    capabilities: {
+      ru: 'ИИ готовит черновик ответа на сообщения в WhatsApp/Telegram/SMS — владелец подтверждает или диктует свой ответ',
+      en: 'AI prepares reply draft for WhatsApp/Telegram/SMS — owner confirms or dictates new reply',
+      es: 'IA prepara respuesta y el propietario confirma o dicta otra',
+    },
+    limitations: {
+      ru: 'Отправка выполняется только после подтверждения владельцем (голосом или кнопкой)',
+      en: 'Sending requires owner confirmation (voice or button)',
+      es: 'El envío requiere confirmación del propietario',
+    },
+    rateLimit: 'OS listener',
+    tokenHealth: 'ok',
+  },
+  {
+    id: 'instagram_api',
+    name: 'Social Media Studio (Instagram / TikTok / Telegram / VK)',
+    releaseTier: 'P1',
+    status: 'connected',
+    capabilities: {
+      ru: 'ИИ сам пишет посты, подбирает фото/видео/файлы для Поста/Сторис/Reels и запрашивает голосовое или кнопочное разрешение перед публикацией',
+      en: 'AI writes posts, suggests photos/videos/files for Post/Story/Reels, and asks voice/button permission before publishing',
+      es: 'IA redacta posts, sugiere fotos/videos y pide confirmación antes de publicar',
+    },
+    limitations: {
+      ru: 'Публикация строго после подтверждения владельцем',
+      en: 'Publication strictly after owner confirmation',
+      es: 'Publicación tras confirmación del propietario',
+    },
+    rateLimit: '25 posts / 24h',
+    tokenHealth: 'ok',
+  },
+  {
+    id: 'restaurant_taxi',
+    name: 'Booking & Taxi Deep-Links (KZ)',
+    releaseTier: 'P2',
+    status: 'connected',
+    capabilities: {
+      ru: 'Голосовой вызов такси (Yandex Go / inDrive) и экстренных служб Казахстана (112 / 103 / 102 / 101)',
+      en: 'Voice taxi booking (Yandex Go / inDrive) and Kazakhstan emergency services (112 / 103)',
+      es: 'Reserva de taxi por voz y emergencias',
+    },
+    limitations: {
+      ru: 'Доступно как онлайн, так и через прямые телефонные протоколы',
+      en: 'Available online and via direct telephony protocols',
+      es: 'Disponible online y por telefonía directa',
+    },
+    rateLimit: 'Unlimited',
+    tokenHealth: 'ok',
+  },
+];
+
+export const INITIAL_MESSAGES: ChatMessage[] = [
+  {
+    id: 'msg-welcome',
+    role: 'assistant',
+    text: 'Привет, Шеф! Я твой 3D ИИ-компаньон на базе Gemini 4 Argon (плюс автономное офлайн-ядро). Я умею звонить по книге контактов, принимать звонки по твоему голосовому согласию, готовить ответы в мессенджерах, создавать посты/сторис/Reels с подбором фото и видео, следить за твоим здоровьем и общаться в любой манере, которой ты меня обучишь!',
+    createdAt: '2026-11-10T07:45:00+05:00',
+    route: 'rule_based',
+    status: 'complete',
+  },
+];
+
+export const INITIAL_ACTIONS: ActionRecord[] = [
+  {
+    actionId: 'act-0001',
+    tool: 'reminder.create',
+    idempotencyKey: 'idem-seed-0001',
+    state: 'SUCCEEDED',
+    source: 'form',
+    toolVersion: '1.0.0',
+    consentSnapshot: {
+      calendar: true,
+      usageStats: true,
+      notifications: true,
+      cloudAi: true,
+      offlineStt: true,
+      contactsCalls: true,
+      messengers: true,
+      socialMedia: true,
+      healthSensors: true,
+      deviceControl: true,
+    },
+    createdAt: '2026-11-10T07:10:00+05:00',
+    updatedAt: '2026-11-10T07:10:00+05:00',
+    summary: 'Создано напоминание: Проверить релизный чек-лист Android',
+    proof: { localReminderId: 'r-101', offlineVerified: true },
+  },
+];
+
+export const TEST_COMMAND_PRESETS: TestCommandPreset[] = [
+  { id: 'TC-01', label: 'TC-01 Позвонить Маме', prompt: { ru: 'Позвони Маме', en: 'Call Mom', es: 'Llamar a Mamá' } },
+  { id: 'TC-02', label: 'TC-02 Входящий звонок', prompt: { ru: 'Симулируй входящий звонок от Андрея', en: 'Simulate incoming call from Andrew', es: 'Simular llamada de Andrés' } },
+  { id: 'TC-03', label: 'TC-03 Ответ в мессенджер', prompt: { ru: 'Ответь на сообщения в мессенджерах', en: 'Reply to messenger messages', es: 'Responder mensajes' } },
+  { id: 'TC-04', label: 'TC-04 Создать Reels/Пост', prompt: { ru: 'Напиши пост для Instagram Reels и подбери видео', en: 'Write an Instagram Reels post and pick video', es: 'Escribir post para Reels' } },
+  { id: 'TC-05', label: 'TC-05 Подбодри меня', prompt: { ru: 'Я сегодня устал, проверь моё состояние и подбодри меня', en: 'I feel tired today, check my state and cheer me up', es: 'Estoy cansado, anímame' } },
+  { id: 'TC-06', label: 'TC-06 Такси KZ', prompt: { ru: 'Вызови такси', en: 'Call a taxi', es: 'Pedir un taxi' } },
+  { id: 'TC-07', label: 'TC-07 Офлайн-возможности', prompt: { ru: 'Покажи, что умеешь без интернета', en: 'Show what you can do offline', es: 'Qué puedes hacer sin internet' } },
+  { id: 'TC-08', label: 'TC-08 Настроение', prompt: { ru: 'Поменяй настроение персонажа на радостное', en: 'Change companion mood to happy', es: 'Cambiar ánimo a feliz' } },
+  { id: 'TC-09', label: 'TC-09 Игра', prompt: { ru: 'Давай поиграем', en: 'Let us play', es: 'Vamos a jugar' } },
+  { id: 'TC-10', label: 'TC-10 Память', prompt: { ru: 'Что ты помнишь обо мне?', en: 'What do you remember about me?', es: 'Qué recuerdas de mí' } },
+];
