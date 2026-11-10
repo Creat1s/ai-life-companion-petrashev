@@ -24,6 +24,8 @@ export const INITIAL_SETTINGS: UserSettings = {
   locale: 'ru',
   timezone: 'Asia/Almaty',
   theme: 'dark',
+  uiMode: 'user',
+  designStyle: 'game',
   airplaneMode: false,
   batterySaver: false,
   lowMemoryMode: false,
