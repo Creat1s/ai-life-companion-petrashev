@@ -18,6 +18,7 @@ import {
   Car,
   HardDriveDownload,
   Mic,
+  MapPin,
 } from 'lucide-react';
 import { PhoneInstallModal } from './components/PhoneInstallModal';
 import { DesignShowcaseModal } from './components/DesignShowcaseModal';
@@ -25,6 +26,7 @@ import { KazakhstanServicesModal } from './components/KazakhstanServicesModal';
 import { VoiceCommandModal } from './components/VoiceCommandModal';
 import { PhoneSuperHubModal } from './components/PhoneSuperHubModal';
 import { SourceDownloadModal } from './components/SourceDownloadModal';
+import { FreeAiSuiteModal, FreeSuiteTab } from './components/FreeAiSuiteModal';
 import {
   ActionRecord,
   ActiveCallState,
@@ -185,6 +187,17 @@ export default function App() {
   const [superHubOpen, setSuperHubOpen] = useState(false);
   const [superHubTab, setSuperHubTab] = useState<SuperHubTab>('calls');
   const [sourceDownloadOpen, setSourceDownloadOpen] = useState(false);
+  const [freeSuiteOpen, setFreeSuiteOpen] = useState(false);
+  const [freeSuiteTab, setFreeSuiteTab] = useState<FreeSuiteTab>('maps');
+  const [quotaExceeded, setQuotaExceeded] = useState(
+    () => typeof window !== 'undefined' && !!window.__GMP_QUOTA_EXCEEDED__
+  );
+
+  useEffect(() => {
+    const handler = () => setQuotaExceeded(true);
+    window.addEventListener('gmp-quota-exceeded', handler);
+    return () => window.removeEventListener('gmp-quota-exceeded', handler);
+  }, []);
 
   const [isStreaming, setIsStreaming] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -935,6 +948,16 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F6F7F9] dark:bg-[#0B0F17] text-[#0F172A] dark:text-[#F1F5F9]">
+      {/* Tier 1 Free Google Maps Demo Key Quota Exceeded Banner */}
+      {quotaExceeded && (
+        <div
+          role="alert"
+          className="bg-amber-950 border-b border-amber-500/50 text-amber-100 px-4 py-2 text-xs text-center"
+        >
+          <strong>Google Maps:</strong> Дневной бесплатный лимит демонстрационного ключа исчерпан. Чтобы продолжить использование карт, подключите собственный API-ключ в настройках Google Cloud или дождитесь сброса бесплатной квоты.
+        </div>
+      )}
+
       {/* Global Incoming Call Floating Banner (if call ringing while modal closed) */}
       {activeCall && !superHubOpen && (
         <div className="bg-emerald-950 border-b border-emerald-500/50 text-white px-4 py-2.5">
@@ -1006,6 +1029,20 @@ export default function App() {
 
           {/* Zone 3: Primary Actions */}
           <div className="flex items-center gap-2 shrink-0">
+            {/* 100% Free AI & Google Maps Studio Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setFreeSuiteTab('maps');
+                setFreeSuiteOpen(true);
+              }}
+              className="min-h-[40px] inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              title="Бесплатные модули: Google Карты, Поиск, Генератор Музыки Lyria Free, Живой Звонок Gemini Live, Транскрибация и Бесплатная БД"
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              <span>Карты · Музыка · Live ($0)</span>
+            </button>
+
             {/* Super-Phone Hub Button */}
             <button
               type="button"
@@ -1017,7 +1054,7 @@ export default function App() {
               title="Звонки, Мессенджеры, Соцсети, Здоровье и Манера речи"
             >
               <PhoneCall className="w-3.5 h-3.5" />
-              <span>Функции телефона</span>
+              <span className="hidden sm:inline">Функции телефона</span>
             </button>
 
             {/* Download Full Source ZIP & GitHub Sync */}
@@ -1179,6 +1216,10 @@ export default function App() {
               setSuperHubOpen(true);
             }}
             onOpenSourceDownload={() => setSourceDownloadOpen(true)}
+            onOpenFreeSuite={(tab) => {
+              setFreeSuiteTab(tab);
+              setFreeSuiteOpen(true);
+            }}
           />
         )}
 
@@ -1448,6 +1489,15 @@ export default function App() {
       <SourceDownloadModal
         isOpen={sourceDownloadOpen}
         onClose={() => setSourceDownloadOpen(false)}
+      />
+
+      {/* 100% Free AI & Google Maps Suite Modal */}
+      <FreeAiSuiteModal
+        isOpen={freeSuiteOpen}
+        initialTab={freeSuiteTab}
+        onClose={() => setFreeSuiteOpen(false)}
+        onTrigger3DAnimation={(cue) => dispatchCompanion({ type: 'SET_ANIMATION', cue })}
+        onSpeakText={speakText}
       />
     </div>
   );
