@@ -917,24 +917,24 @@ ${customInstruction ? `Пожелание владельца к ответу: "$
 
       const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
       const places = chunks
-        .map(
-          (c: {
-            maps?: {
-              uri?: string;
-              title?: string;
-              placeAnswerSources?: { reviewSnippets?: { content?: string }[] };
-            };
-          }) =>
-            c.maps?.uri
-              ? {
-                  uri: c.maps.uri,
-                  title: c.maps.title || 'Открыть место в Google Картах',
-                  snippets: (c.maps.placeAnswerSources?.reviewSnippets || [])
-                    .map((s) => s.content || '')
-                    .filter(Boolean),
-                }
-              : null
-        )
+        .map((c) => {
+          const mapsData = c.maps as
+            | {
+                uri?: string;
+                title?: string;
+                placeAnswerSources?: { reviewSnippets?: { content?: string; text?: string }[] };
+              }
+            | undefined;
+          return mapsData?.uri
+            ? {
+                uri: mapsData.uri,
+                title: mapsData.title || 'Открыть место в Google Картах',
+                snippets: (mapsData.placeAnswerSources?.reviewSnippets || [])
+                  .map((s) => s.content || s.text || '')
+                  .filter(Boolean),
+              }
+            : null;
+        })
         .filter(Boolean);
 
       res.json({
@@ -1464,10 +1464,11 @@ pause
 
   wss.on('connection', async (clientWs) => {
     const ai = getGenAIClient();
-    let liveSession: {
+    interface ActiveLiveSession {
       sendRealtimeInput: (input: { audio?: { data: string; mimeType: string }; text?: string }) => void;
       close: () => void;
-    } | null = null;
+    }
+    const sessionHolder: { current: ActiveLiveSession | null } = { current: null };
 
     try {
       const session = await ai.live.connect({
@@ -1530,7 +1531,7 @@ pause
           },
         },
       });
-      liveSession = session as unknown as typeof liveSession;
+      sessionHolder.current = session as unknown as ActiveLiveSession;
     } catch (err: unknown) {
       if (clientWs.readyState === clientWs.OPEN) {
         clientWs.send(
@@ -1552,12 +1553,12 @@ pause
           data?: string;
           text?: string;
         };
-        if (msg.type === 'audio' && msg.data && liveSession) {
-          liveSession.sendRealtimeInput({
+        if (msg.type === 'audio' && msg.data && sessionHolder.current) {
+          sessionHolder.current.sendRealtimeInput({
             audio: { data: msg.data, mimeType: 'audio/pcm;rate=16000' },
           });
-        } else if (msg.type === 'text' && msg.text && liveSession) {
-          liveSession.sendRealtimeInput({
+        } else if (msg.type === 'text' && msg.text && sessionHolder.current) {
+          sessionHolder.current.sendRealtimeInput({
             text: msg.text,
           });
         }
@@ -1568,7 +1569,7 @@ pause
 
     clientWs.on('close', () => {
       try {
-        liveSession?.close();
+        sessionHolder.current?.close();
       } catch {
         // ignore
       }
