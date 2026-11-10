@@ -1,12 +1,17 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { AvatarId, CompanionMood, AnimationCue, RoomAtmosphere } from '../types/companion';
 import { buildCharacter3D, Character3DParts } from '../engine/threeProceduralCharacters';
+import {
+  useFramer3DAnimationStateMachine,
+  Core3DAnimMode,
+  Core3DState,
+} from '../engine/useFramer3DAnimationStateMachine';
 import { Sparkles, Smile, Brain, Volume2, Waves } from 'lucide-react';
 
-export type Core3DAnimState = 'auto' | 'idle' | 'happy' | 'think' | 'speak';
+export type Core3DAnimState = Core3DAnimMode;
 
 interface ThreeCompanionSceneProps {
   avatarId: AvatarId;
@@ -21,13 +26,6 @@ interface ThreeCompanionSceneProps {
   isSpeaking?: boolean;
   onTap?: () => void;
   onTapCompanion?: () => void;
-}
-
-interface BlendWeights {
-  idle: number;
-  happy: number;
-  think: number;
-  speak: number;
 }
 
 export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
@@ -46,65 +44,25 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const partsRef = useRef<Character3DParts | null>(null);
-  const pointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const jumpImpulseRef = useRef<number>(0);
-  const spinImpulseRef = useRef<number>(0);
-
-  const [manualState, setManualState] = useState<Core3DAnimState>('auto');
-  const manualStateRef = useRef<Core3DAnimState>('auto');
 
   const effectiveListening = isListening || animation === 'listen';
   const effectiveSpeaking = isSpeaking || animation === 'speak';
 
-  const moodRef = useRef(mood);
-  const energyRef = useRef(energy);
-  const animationRef = useRef<AnimationCue>(animation);
-  const listeningRef = useRef(effectiveListening);
-  const speakingRef = useRef(effectiveSpeaking);
-  const reducedMotionRef = useRef(reducedMotion);
-
-  // Determine the resolved active 3D state for UI badge & Framer Motion aura
-  const resolveTarget3DState = (
-    manual: Core3DAnimState,
-    cue: AnimationCue,
-    curMood: CompanionMood,
-    speaking: boolean
-  ): 'idle' | 'happy' | 'think' | 'speak' => {
-    if (manual !== 'auto') return manual;
-    if (speaking || cue === 'speak') return 'speak';
-    if (cue === 'think' || cue === 'listen' || curMood === 'curious') return 'think';
-    if (cue === 'play' || cue === 'success' || curMood === 'happy') return 'happy';
-    return 'idle';
-  };
-
-  const activeResolvedState = resolveTarget3DState(
-    manualState,
+  // Framer Motion 3D Physics & State Machine Hook (Idle, Happy, Think, Speak)
+  const framerRig = useFramer3DAnimationStateMachine({
     animation,
     mood,
-    effectiveSpeaking
-  );
+    isSpeaking: effectiveSpeaking,
+    isListening: effectiveListening,
+  });
+
+  const reducedMotionRef = useRef(reducedMotion);
+  const energyRef = useRef(energy);
 
   useEffect(() => {
-    moodRef.current = mood;
-    energyRef.current = energy;
-    animationRef.current = animation;
-    listeningRef.current = effectiveListening;
-    speakingRef.current = effectiveSpeaking;
     reducedMotionRef.current = reducedMotion;
-
-    if (animation === 'play' || animation === 'success') {
-      jumpImpulseRef.current = 1.0;
-      spinImpulseRef.current = 1.0;
-    }
-  }, [mood, energy, animation, effectiveListening, effectiveSpeaking, reducedMotion]);
-
-  useEffect(() => {
-    manualStateRef.current = manualState;
-    if (manualState === 'happy') {
-      jumpImpulseRef.current = 1.0;
-      spinImpulseRef.current = 1.0;
-    }
-  }, [manualState]);
+    energyRef.current = energy;
+  }, [reducedMotion, energy]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -170,7 +128,7 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
     partsRef.current = characterParts;
     scene.add(characterParts.root);
 
-    // 3D Acoustic / Thought Halo Ring inside WebGL (replaces legacy CSS ring/orbit)
+    // 3D Acoustic / Thought Halo Ring inside WebGL
     const haloRingGeo = new THREE.TorusGeometry(1.55, 0.022, 16, 64);
     const haloRingMat = new THREE.MeshBasicMaterial({
       color: rimColor,
@@ -181,14 +139,6 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
     haloRingMesh.rotation.x = Math.PI * 0.42;
     characterParts.root.add(haloRingMesh);
 
-    // Continuous State Blending Weights (Smoothly interpolated every frame via MathUtils.damp)
-    const weights: BlendWeights = {
-      idle: 1.0,
-      happy: 0.0,
-      think: 0.0,
-      speak: 0.0,
-    };
-
     const clock = new THREE.Clock();
     let frameId = 0;
     let blinkTimer = 0;
@@ -197,58 +147,41 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
     let saccadeOffset = { x: 0, y: 0 };
     const prevPos = new THREE.Vector3(0, 0, 0);
 
-    // Second-order damped spring physics state for volume-preserving Squash & Stretch
-    let springScaleY = 1.0;
-    let springVelY = 0.0;
-
-    const animate = () => {
-      frameId = requestAnimationFrame(animate);
+    const animateLoop = () => {
+      frameId = requestAnimationFrame(animateLoop);
       const dt = Math.min(clock.getDelta(), 0.05);
       const t = reducedMotionRef.current ? 0 : clock.getElapsedTime();
 
       const parts = partsRef.current;
       if (!parts) return;
 
-      const targetState = resolveTarget3DState(
-        manualStateRef.current,
-        animationRef.current,
-        moodRef.current,
-        speakingRef.current
-      );
+      // ---------------------------------------------------------------------------
+      // 1. READ LIVE FRAMER MOTION SPRING WEIGHTS (Idle <-> Happy <-> Think <-> Speak)
+      // Driven by Framer Motion's useSpring() physics engine for seamless transitions.
+      // ---------------------------------------------------------------------------
+      const rawIdle = Math.max(0, framerRig.idleSpring.get());
+      const rawHappy = Math.max(0, framerRig.happySpring.get());
+      const rawThink = Math.max(0, framerRig.thinkSpring.get());
+      const rawSpeak = Math.max(0, framerRig.speakSpring.get());
+      const weightSum = Math.max(0.0001, rawIdle + rawHappy + rawThink + rawSpeak);
 
-      // ---------------------------------------------------------------------------
-      // 1. CONTINUOUS 3D STATE-MACHINE WEIGHT BLENDING (Idle <-> Happy <-> Think <-> Speak)
-      // Smooth exponential damping ensures zero snapping when transitioning between states.
-      // ---------------------------------------------------------------------------
-      const blendSpeed = 5.5;
-      weights.idle = THREE.MathUtils.damp(
-        weights.idle,
-        targetState === 'idle' ? 1 : 0,
-        blendSpeed,
-        dt
-      );
-      weights.happy = THREE.MathUtils.damp(
-        weights.happy,
-        targetState === 'happy' ? 1 : 0,
-        blendSpeed,
-        dt
-      );
-      weights.think = THREE.MathUtils.damp(
-        weights.think,
-        targetState === 'think' ? 1 : 0,
-        blendSpeed,
-        dt
-      );
-      weights.speak = THREE.MathUtils.damp(
-        weights.speak,
-        targetState === 'speak' ? 1 : 0,
-        blendSpeed,
-        dt
-      );
+      const weights = {
+        idle: rawIdle / weightSum,
+        happy: rawHappy / weightSum,
+        think: rawThink / weightSum,
+        speak: rawSpeak / weightSum,
+      };
+
+      // Framer Motion Camera Spring Distance (maintains generous unclipped framing)
+      camera.position.z = framerRig.cameraDistanceSpring.get();
+
+      // Framer Motion Smooth Pointer Gaze Coordinates
+      const ptrX = framerRig.pointerXSpring.get();
+      const ptrY = framerRig.pointerYSpring.get();
 
       // ---------------------------------------------------------------------------
       // 2. BLENDED 3D ROOT TRAJECTORY & INERTIAL BANKING (DRAG)
-      // Each state defines its own 3D spatial curve; the active position is their weighted sum.
+      // Each state defines its own 3D spatial curve; active position is weighted sum.
       // ---------------------------------------------------------------------------
       // Idle: Calm 3D Lissajous Figure-8 levitation
       const idleX = Math.sin(t * 1.15) * 0.2;
@@ -256,91 +189,75 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
       const idleZ = Math.cos(t * 1.15) * 0.12;
 
       // Happy: Joyful rhythmic hop arc + elevated buoyancy
-      const happyX = Math.sin(t * 2.4) * 0.28;
-      const happyY = Math.abs(Math.sin(t * 3.8)) * 0.34 + 0.08;
-      const happyZ = 0.22 + Math.sin(t * 2.4) * 0.12;
+      const happyX = Math.sin(t * 2.4) * 0.26;
+      const happyY = Math.abs(Math.sin(t * 3.8)) * 0.3 + 0.06;
+      const happyZ = 0.18 + Math.sin(t * 2.4) * 0.12;
 
       // Think: Contemplative orbital spiral in 3D space
-      const thinkX = Math.cos(t * 1.65) * 0.26;
-      const thinkY = Math.sin(t * 3.3) * 0.12 + 0.1;
-      const thinkZ = Math.sin(t * 1.65) * 0.18;
+      const thinkX = Math.cos(t * 1.65) * 0.24;
+      const thinkY = Math.sin(t * 3.3) * 0.12 + 0.08;
+      const thinkZ = Math.sin(t * 1.65) * 0.16;
 
       // Speak: Attentive forward lean toward the user with conversational micro-sway
       const speakX = Math.sin(t * 1.9) * 0.1;
       const speakY = Math.sin(t * 3.8) * 0.09 + 0.04;
-      const speakZ = 0.38;
+      const speakZ = 0.32;
 
-      let targetX =
+      const targetX =
         idleX * weights.idle +
         happyX * weights.happy +
         thinkX * weights.think +
         speakX * weights.speak;
-      let targetY =
+      const targetY =
         idleY * weights.idle +
         happyY * weights.happy +
         thinkY * weights.think +
-        speakY * weights.speak;
+        speakY * weights.speak +
+        framerRig.jumpArcSpring.get();
       const targetZ =
         idleZ * weights.idle +
         happyZ * weights.happy +
         thinkZ * weights.think +
         speakZ * weights.speak;
 
-      // Add interactive tap jump impulse arc
-      if (jumpImpulseRef.current > 0.001) {
-        targetY += Math.sin(jumpImpulseRef.current * Math.PI) * 0.56;
-        jumpImpulseRef.current = Math.max(0, jumpImpulseRef.current - dt * 2.1);
-      }
-
-      parts.root.position.x = THREE.MathUtils.damp(parts.root.position.x, targetX, 6.5, dt);
-      parts.root.position.y = THREE.MathUtils.damp(parts.root.position.y, targetY, 6.5, dt);
-      parts.root.position.z = THREE.MathUtils.damp(parts.root.position.z, targetZ, 5.5, dt);
+      parts.root.position.x = THREE.MathUtils.damp(parts.root.position.x, targetX, 8, dt);
+      parts.root.position.y = THREE.MathUtils.damp(parts.root.position.y, targetY, 8, dt);
+      parts.root.position.z = THREE.MathUtils.damp(parts.root.position.z, targetZ, 7, dt);
 
       // Velocity-driven inertial pitch/roll banking
       const velX = (parts.root.position.x - prevPos.x) / Math.max(dt, 0.001);
       const velY = (parts.root.position.y - prevPos.y) / Math.max(dt, 0.001);
       prevPos.copy(parts.root.position);
 
-      if (spinImpulseRef.current > 0.001) {
-        spinImpulseRef.current = Math.max(0, spinImpulseRef.current - dt * 2.3);
-      }
-      const spinAngle =
-        spinImpulseRef.current > 0
-          ? (1 - spinImpulseRef.current) * Math.PI * 2
-          : 0;
+      const spinAngle = framerRig.spinYawSpring.get();
 
       parts.bodyGroup.rotation.z = THREE.MathUtils.damp(
         parts.bodyGroup.rotation.z,
         -velX * 0.22 + weights.happy * Math.sin(t * 4.5) * 0.12,
-        7,
+        8,
         dt
       );
       parts.bodyGroup.rotation.x = THREE.MathUtils.damp(
         parts.bodyGroup.rotation.x,
         velY * 0.16 + weights.speak * 0.1 + weights.think * -0.06,
-        7,
+        8,
         dt
       );
       parts.bodyGroup.rotation.y =
         spinAngle +
-        THREE.MathUtils.damp(
-          parts.bodyGroup.rotation.y - spinAngle,
-          pointerRef.current.x * 0.28 +
-            weights.idle * Math.sin(t * 0.9) * 0.12 +
-            weights.speak * Math.sin(t * 2.8) * 0.14,
-          5.5,
-          dt
-        );
+        ptrX * 0.28 +
+        weights.idle * Math.sin(t * 0.9) * 0.12 +
+        weights.speak * Math.sin(t * 2.8) * 0.14;
 
       // ---------------------------------------------------------------------------
       // 3. BLENDED 3D HEAD POSE (Idle Gaze vs Happy Nod vs Think Tilt vs Speak Cadence)
       // ---------------------------------------------------------------------------
       const headYaw =
-        pointerRef.current.x * 0.34 +
+        ptrX * 0.34 +
         weights.think * 0.18 +
         weights.speak * Math.sin(t * 5.2) * 0.09;
       const headPitch =
-        -pointerRef.current.y * 0.24 +
+        -ptrY * 0.24 +
         weights.think * -0.15 +
         weights.happy * Math.sin(t * 7.6) * 0.08 +
         weights.speak * (Math.sin(t * 11.0) * 0.065 - 0.04);
@@ -350,49 +267,36 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
         weights.happy * Math.sin(t * 3.8) * 0.14 +
         weights.speak * Math.cos(t * 4.4) * 0.08;
 
-      parts.headGroup.rotation.y = THREE.MathUtils.damp(parts.headGroup.rotation.y, headYaw, 8, dt);
-      parts.headGroup.rotation.x = THREE.MathUtils.damp(parts.headGroup.rotation.x, headPitch, 8, dt);
-      parts.headGroup.rotation.z = THREE.MathUtils.damp(parts.headGroup.rotation.z, headRoll, 7, dt);
+      parts.headGroup.rotation.y = THREE.MathUtils.damp(parts.headGroup.rotation.y, headYaw, 9, dt);
+      parts.headGroup.rotation.x = THREE.MathUtils.damp(parts.headGroup.rotation.x, headPitch, 9, dt);
+      parts.headGroup.rotation.z = THREE.MathUtils.damp(parts.headGroup.rotation.z, headRoll, 8, dt);
 
       // ---------------------------------------------------------------------------
-      // 4. SECOND-ORDER SPRING SQUASH & STRETCH (Volume-Preserving: Sx = Sz = 1 / sqrt(Sy))
+      // 4. FRAMER MOTION SPRING SQUASH & STRETCH (Volume-Preserving: Sx = Sz = 1 / sqrt(Sy))
+      // Combines Framer Motion transition anticipation spring with continuous breathing
       // ---------------------------------------------------------------------------
-      const breathTargetY =
-        1.0 +
-        weights.idle * Math.sin(t * 2.6) * 0.026 +
-        weights.happy * Math.sin(t * 7.6) * 0.065 +
+      const breathWave =
+        weights.idle * Math.sin(t * 2.6) * 0.025 +
+        weights.happy * Math.sin(t * 7.6) * 0.06 +
         weights.think * Math.sin(t * 2.0) * 0.02 +
         weights.speak * Math.sin(t * 14.0) * 0.032;
 
-      const stiffness = 145;
-      const damping = 12;
-      const springForce = (breathTargetY - springScaleY) * stiffness;
-      springVelY += springForce * dt;
-      springVelY *= Math.exp(-damping * dt);
-      springScaleY += springVelY * dt;
-
-      const clampedSy = THREE.MathUtils.clamp(springScaleY, 0.78, 1.28);
-      const invSqrtSy = 1 / Math.sqrt(clampedSy);
-      parts.bodyGroup.scale.set(invSqrtSy, clampedSy, invSqrtSy);
+      const combinedSy = THREE.MathUtils.clamp(
+        framerRig.squashStretchSpring.get() + breathWave,
+        0.78,
+        1.26
+      );
+      const invSqrtSy = 1 / Math.sqrt(combinedSy);
+      parts.bodyGroup.scale.set(invSqrtSy, combinedSy, invSqrtSy);
 
       // ---------------------------------------------------------------------------
-      // 5. MULTI-JOINT KINEMATIC WAVE PROPAGATION FOR 3D LIMBS (Tentacles / Wings / Tails)
-      // Frequency and amplitude smoothly morph according to Idle / Happy / Think / Speak weights.
+      // 5. MULTI-JOINT KINEMATIC WAVE PROPAGATION DRIVEN BY FRAMER MOTION SPRINGS
       // ---------------------------------------------------------------------------
-      const waveFreq =
-        2.6 * weights.idle +
-        5.2 * weights.happy +
-        2.1 * weights.think +
-        4.4 * weights.speak;
-      const waveAmp =
-        0.17 * weights.idle +
-        0.31 * weights.happy +
-        0.14 * weights.think +
-        0.24 * weights.speak;
+      const waveFreq = framerRig.waveFreqSpring.get();
+      const waveAmp = framerRig.waveAmpSpring.get();
 
       // 5A. Nova's 8 Articulated Multi-Joint S-Curled Tentacles
       parts.articulatedTentacles.forEach((chain, tIdx) => {
-        // In Speak or Think mode, the front 2 tentacles gesture expressively upward!
         const isFrontTentacle = tIdx === 1 || tIdx === 2;
         const gestureLift =
           isFrontTentacle
@@ -492,17 +396,16 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
         };
       }
 
-      // In Think state, eyes naturally ponder upward and to the side
       const thinkGazeX = weights.think * (0.065 * Math.cos(t * 0.9));
       const thinkGazeY = weights.think * 0.055;
 
       const gazeTargetX = THREE.MathUtils.clamp(
-        pointerRef.current.x * 0.095 + saccadeOffset.x + thinkGazeX,
+        ptrX * 0.095 + saccadeOffset.x + thinkGazeX,
         -0.11,
         0.11
       );
       const gazeTargetY = THREE.MathUtils.clamp(
-        pointerRef.current.y * 0.075 + saccadeOffset.y + thinkGazeY,
+        ptrY * 0.075 + saccadeOffset.y + thinkGazeY,
         -0.085,
         0.085
       );
@@ -532,7 +435,6 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
         dt
       );
 
-      // Pupil dilation responds to Happy & Speak states
       const pupilDilation = 1.0 + weights.happy * 0.15 + weights.speak * 0.08;
       parts.leftPupilGroup.scale.setScalar(
         THREE.MathUtils.damp(parts.leftPupilGroup.scale.x, pupilDilation, 8, dt)
@@ -541,7 +443,6 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
         THREE.MathUtils.damp(parts.rightPupilGroup.scale.x, pupilDilation, 8, dt)
       );
 
-      // Natural Blinking + Expressive Eyelid Pose per State
       blinkTimer += dt;
       if (!isBlinking && blinkTimer > 3.1 + (t % 1.4)) {
         isBlinking = true;
@@ -555,7 +456,7 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
       const restLidRot =
         -0.55 * weights.idle +
         -0.72 * weights.happy +
-        -0.36 * weights.think + // Ponderous half-hooded focus in Think mode
+        -0.36 * weights.think +
         -0.64 * weights.speak;
       const targetLidRot = isBlinking ? 0.34 : restLidRot;
 
@@ -594,7 +495,6 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
         mat.emissiveIntensity = glowBoost;
       });
 
-      // 3D Halo Ring expands and rotates in Think / Speak states (replacing CSS rings)
       const haloOpacity = Math.max(weights.think * 0.55, weights.speak * 0.45);
       haloRingMat.opacity = THREE.MathUtils.damp(haloRingMat.opacity, haloOpacity, 8, dt);
       haloRingMesh.rotation.z = t * (1.2 + weights.think * 2.4);
@@ -608,7 +508,7 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
       renderer.render(scene, camera);
     };
 
-    animate();
+    animateLoop();
 
     const handleResize = () => {
       if (!container) return;
@@ -638,31 +538,33 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
     const rect = e.currentTarget.getBoundingClientRect();
     const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     const ny = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
-    pointerRef.current = { x: nx, y: ny };
+    framerRig.setPointerTarget(nx, ny);
   };
 
   const handlePointerLeave = () => {
-    pointerRef.current = { x: 0, y: 0 };
+    framerRig.setPointerTarget(0, 0);
   };
 
   const handleClick = () => {
-    jumpImpulseRef.current = 1.0;
-    spinImpulseRef.current = 1.0;
+    framerRig.triggerTapImpulse();
     if (onTap) onTap();
     if (onTapCompanion) onTapCompanion();
   };
 
   const stateTabs: {
-    id: Core3DAnimState;
+    id: Core3DAnimMode;
+    stateKey?: Core3DState;
     label: string;
     icon: React.FC<{ className?: string }>;
   }[] = [
     { id: 'auto', label: 'Авто ИИ', icon: Sparkles },
-    { id: 'idle', label: 'Idle (Парение)', icon: Waves },
-    { id: 'happy', label: 'Happy (Радость)', icon: Smile },
-    { id: 'think', label: 'Think (Мысль)', icon: Brain },
-    { id: 'speak', label: 'Speak (Речь)', icon: Volume2 },
+    { id: 'idle', stateKey: 'idle', label: 'Idle (Парение)', icon: Waves },
+    { id: 'happy', stateKey: 'happy', label: 'Happy (Радость)', icon: Smile },
+    { id: 'think', stateKey: 'think', label: 'Think (Мысль)', icon: Brain },
+    { id: 'speak', stateKey: 'speak', label: 'Speak (Речь)', icon: Volume2 },
   ];
+
+  const activeResolvedState = framerRig.activeState;
 
   return (
     <motion.div
@@ -706,44 +608,54 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
         onPointerLeave={handlePointerLeave}
         onClick={handleClick}
         className="w-full flex-1 overflow-visible min-h-[320px] sm:min-h-[410px] cursor-pointer flex items-center justify-center"
-        title="Нажмите на 3D-персонажа для акробатического прыжка (Three.js Spring Physics)"
+        title="Нажмите на 3D-персонажа для акробатического прыжка (Framer Motion Spring Physics)"
       />
 
-      {/* Framer Motion Interactive 3D State Switcher (Idle / Happy / Think / Speak) */}
+      {/* Framer Motion Interactive 3D State Switcher + Live Spring Blending Telemetry */}
       {size !== 'sm' && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 260, damping: 24, delay: 0.05 }}
-          className="z-20 -mt-2 flex flex-wrap items-center justify-center gap-1 p-1.5 rounded-2xl bg-slate-900/80 border border-white/10 backdrop-blur-md shadow-xl"
+          className="z-20 -mt-2 flex flex-col items-center gap-1.5"
         >
-          {stateTabs.map((item) => {
-            const Icon = item.icon;
-            const isSelected = manualState === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setManualState(item.id);
-                }}
-                className={`relative min-h-[30px] inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-semibold transition-colors cursor-pointer ${
-                  isSelected ? 'text-white' : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                {isSelected && (
-                  <motion.span
-                    layoutId="active3DStatePill"
-                    transition={{ type: 'spring', stiffness: 380, damping: 28 }}
-                    className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 shadow-sm -z-10"
-                  />
-                )}
-                <Icon className="w-3.5 h-3.5" />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
+          <div className="flex flex-wrap items-center justify-center gap-1 p-1.5 rounded-2xl bg-slate-900/85 border border-white/10 backdrop-blur-md shadow-xl">
+            {stateTabs.map((item) => {
+              const Icon = item.icon;
+              const isSelected = framerRig.manualMode === item.id;
+              const weightPct = item.stateKey
+                ? framerRig.liveWeightsSnapshot[item.stateKey]
+                : null;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    framerRig.setManualMode(item.id);
+                  }}
+                  className={`relative min-h-[30px] inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-semibold transition-colors cursor-pointer ${
+                    isSelected ? 'text-white' : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  {isSelected && (
+                    <motion.span
+                      layoutId="active3DStatePill"
+                      transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+                      className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 shadow-sm -z-10"
+                    />
+                  )}
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{item.label}</span>
+                  {weightPct !== null && weightPct > 0 && (
+                    <span className="font-mono text-[10px] opacity-80 tabular-nums">
+                      {weightPct}%
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </motion.div>
       )}
     </motion.div>
