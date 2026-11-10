@@ -612,16 +612,20 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
 
     const handleResize = () => {
       if (!container) return;
-      const w = container.clientWidth || 380;
-      const h = container.clientHeight || 400;
+      const w = container.clientWidth || (size === 'sm' ? 150 : 480);
+      const h = container.clientHeight || (size === 'sm' ? 150 : 440);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
     };
 
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(handleResize) : null;
+    resizeObserver?.observe(container);
     window.addEventListener('resize', handleResize);
 
     return () => {
+      resizeObserver?.disconnect();
       window.removeEventListener('resize', handleResize);
       cancelAnimationFrame(frameId);
       envTarget.dispose();
@@ -665,7 +669,7 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
       initial={{ opacity: 0, scale: 0.92 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ type: 'spring', stiffness: 220, damping: 22 }}
-      className="relative w-full h-full min-h-[280px] sm:min-h-[390px] flex flex-col items-center justify-center select-none"
+      className="relative w-full h-full overflow-visible min-h-[340px] sm:min-h-[440px] flex flex-col items-center justify-center select-none"
     >
       {/* Framer Motion Reactive State Aura Behind 3D Model */}
       <AnimatePresence mode="wait">
@@ -676,14 +680,14 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
             opacity: activeResolvedState === 'idle' ? 0.35 : 0.65,
             scale:
               activeResolvedState === 'happy'
-                ? 1.12
+                ? 1.15
                 : activeResolvedState === 'speak'
-                  ? 1.08
-                  : 1.0,
+                  ? 1.1
+                  : 1.02,
           }}
           exit={{ opacity: 0, scale: 0.85 }}
           transition={{ type: 'spring', stiffness: 160, damping: 20 }}
-          className={`pointer-events-none absolute w-64 h-64 sm:w-80 sm:h-80 rounded-full blur-3xl -z-10 ${
+          className={`pointer-events-none absolute w-72 h-72 sm:w-96 sm:h-96 rounded-full blur-3xl -z-10 ${
             activeResolvedState === 'happy'
               ? 'bg-fuchsia-500/30 dark:bg-purple-500/35'
               : activeResolvedState === 'think'
@@ -695,13 +699,13 @@ export const ThreeCompanionScene: React.FC<ThreeCompanionSceneProps> = ({
         />
       </AnimatePresence>
 
-      {/* Interactive Three.js WebGL 3D Viewport */}
+      {/* Unclipped Interactive Three.js WebGL 3D Viewport */}
       <div
         ref={containerRef}
         onPointerMove={handlePointerMove}
         onPointerLeave={handlePointerLeave}
         onClick={handleClick}
-        className="w-full flex-1 min-h-[260px] sm:min-h-[350px] cursor-pointer flex items-center justify-center"
+        className="w-full flex-1 overflow-visible min-h-[320px] sm:min-h-[410px] cursor-pointer flex items-center justify-center"
         title="Нажмите на 3D-персонажа для акробатического прыжка (Three.js Spring Physics)"
       />
 
