@@ -505,7 +505,7 @@ ${gitInfo.commits
                         </label>
                         {provider === 'github' && (
                           <a
-                            href="https://github.com/settings/tokens/new?description=AI+Life+Companion+Petrashev+Viktor&scopes=repo"
+                            href={`https://github.com/settings/tokens/new?description=AI+Life+Companion+Petrashev+${new Date().getHours()}${new Date().getMinutes()}${new Date().getSeconds()}&scopes=repo`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold transition-colors shadow-sm"
